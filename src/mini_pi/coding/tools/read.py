@@ -1,11 +1,13 @@
 import asyncio
-from itertools import islice
+import base64
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from ...agent.types import ToolExecutionResult
-from ...ai.types import TextContent, ToolDefinition
+from ...ai.types import ImageContent, TextContent, ToolDefinition
+from .paths import resolve_to_cwd
+from .truncate import DEFAULT_MAX_BYTES, truncate_text
 
 class ReadArguments(BaseModel):
     model_config = ConfigDict(
@@ -14,7 +16,7 @@ class ReadArguments(BaseModel):
     )
     path: str = Field(
         min_length=1,
-        description="The file path, absolute or ralative to the working directory.",
+        description="The file path, absolute or relative to the working directory.",
     )
 
     offset: int = Field(
@@ -23,10 +25,9 @@ class ReadArguments(BaseModel):
         description="The first line to read, starting from 1.",
     )
 
-    limit: int = Field(
-        default=200,
+    limit: int | None = Field(
+        default=None,
         ge=1,
-        le=2000,
         description="The maximum number of lines to read.",
     )
 
@@ -34,8 +35,10 @@ class ReadArguments(BaseModel):
 class ReadTool:
     name: str = "read"
     description: str = (
-        "Read a UTF-8 text file. "
-        "Use offset and limit to read a range of lines."
+        "Read a UTF-8 text file or an image (PNG, JPEG, GIF, WebP, BMP). "
+        "Images are returned as attachments. Text is limited to 2000 lines or 50KB, "
+        "whichever is hit first. Use offset (1-based) and limit for large files; "
+        "continue with the suggested offset to read more."
     )
 
     def __init__(self, cwd: Path) -> None:
@@ -55,12 +58,7 @@ class ReadTool:
     ) -> ToolExecutionResult:
         args = ReadArguments.model_validate(arguments)
 
-        path = Path(args.path)
-
-        if not path.is_absolute():
-            path = self._cwd / path
-
-        path = path.resolve()
+        path = resolve_to_cwd(args.path, self._cwd)
 
         return await asyncio.to_thread(
             self._read,
@@ -73,31 +71,63 @@ class ReadTool:
         path: Path,
         args: ReadArguments,
     ) -> ToolExecutionResult:
+        buffer = path.read_bytes()
+        mime_type: str | None = None
+        if buffer.startswith(b"\x89PNG\r\n\x1a\n"):
+            mime_type = "image/png"
+        elif buffer.startswith(b"\xff\xd8\xff"):
+            mime_type = "image/jpeg"
+        elif buffer.startswith((b"GIF87a", b"GIF89a")):
+            mime_type = "image/gif"
+        elif buffer.startswith(b"RIFF") and buffer[8:12] == b"WEBP":
+            mime_type = "image/webp"
+        elif buffer.startswith(b"BM"):
+            mime_type = "image/bmp"
+        if mime_type is not None:
+            return ToolExecutionResult(
+                content=[
+                    TextContent(text=f"Read image file [{mime_type}]: {args.path}"),
+                    ImageContent(data=base64.b64encode(buffer).decode("ascii"), mime_type=mime_type),
+                ],
+                details={"path": str(path), "mimeType": mime_type, "bytes": len(buffer)},
+            )
+        text = buffer.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+        # Split only LF: Unicode separators inside source literals are not lines.
+        parts = text.split("\n")
+        lines = [line + "\n" for line in parts[:-1]]
+        if parts[-1]:
+            lines.append(parts[-1])
         start = args.offset - 1
-        stop = start + args.limit
-
-        with path.open("r", encoding="utf-8") as file:
-            lines = list(islice(file, start, stop))
-            has_more = next(file, None) is not None
-
-        text = "".join(lines)
-
-        if not lines:
-            text = "[No lines in the requested range.]"
-
-        if has_more:
-            next_offset = args.offset + len(lines)
+        if start >= len(lines) and (lines or start != 0):
+            raise ValueError(
+                f"Offset {args.offset} is beyond end of file ({len(lines)} lines total)"
+            )
+        stop = len(lines) if args.limit is None else start + args.limit
+        truncation = truncate_text("".join(lines[start:stop]))
+        text = truncation.content
+        has_more = start + truncation.output_lines < len(lines)
+        if truncation.first_line_exceeds_limit:
+            text = (
+                f"[Line {args.offset} exceeds {DEFAULT_MAX_BYTES} bytes. "
+                "Use bash or powershell to inspect a smaller portion of this line.]"
+            )
+        elif has_more:
+            next_offset = args.offset + truncation.output_lines
             text += (
-                "\n\n[More lines are available. "
+                f"\n\n[Showing {truncation.output_lines} lines starting at {args.offset}. "
                 f"Use offset={next_offset} to continue.]"
             )
 
+        details: dict[str, JsonValue] = {
+            "path": str(path),
+            "offset": args.offset,
+            "lines_read": truncation.output_lines,
+            "has_more": has_more,
+        }
+        if truncation.truncated:
+            details["truncation"] = truncation.model_dump(mode="json", exclude={"content"})
+
         return ToolExecutionResult(
             content=[TextContent(text=text)],
-            details={
-                "path": str(path),
-                "offset": args.offset,
-                "lines_read": len(lines),
-                "has_more": has_more,
-            },
+            details=details,
         )

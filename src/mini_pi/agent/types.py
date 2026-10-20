@@ -2,13 +2,13 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from ..ai.types import TextContent, ToolDefinition,ToolResultMessage
+from ..ai.types import ToolContent, ToolDefinition, ToolResultMessage
 
 
 class ToolExecutionResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    content: list[TextContent]
+    content: list[ToolContent]
     details: dict[str, JsonValue] = Field(default_factory=dict)
 
 

@@ -26,3 +26,9 @@ htmlcov/
 # OS-generated files
 .DS_Store
 Thumbs.db
+
+# Local CLI conversations, launch settings, and writer locks
+.mini-pi/
+
+# Local experiments, excluded from version control
+/demo/

@@ -10,6 +10,20 @@ class TextContent(BaseModel):
     text: str
 
 
+class ImageContent(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    type: Literal["image"] = "image"
+    data: str
+    mime_type: str = Field(alias="mimeType")
+
+
+ToolContent = Annotated[
+    TextContent | ImageContent,
+    Field(discriminator="type"),
+]
+
+
 class ToolCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -29,7 +43,7 @@ class UserMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Literal["user"] = "user"
-    content: str | list[TextContent]
+    content: str | list[ToolContent]
     timestamp: int
 
 
@@ -39,7 +53,7 @@ class ToolResultMessage(BaseModel):
     role: Literal["toolResult"] = "toolResult"
     tool_call_id: str
     tool_name: str
-    content: list[TextContent]
+    content: list[ToolContent]
     is_error: bool
     timestamp: int
 
@@ -103,6 +117,7 @@ class ModelSpec(BaseModel):
 
     context_window: int | None = Field(default=None,gt=0)
     max_output_tokens: int | None = Field(default=None,gt=0)
+    supports_images: bool = False
 
 
 class ToolDefinition(BaseModel):
@@ -125,4 +140,3 @@ class ModelOptions(BaseModel):
 
     max_output_tokens: int | None = Field(default=None,gt=0)
     temperature: float | None = None
-    

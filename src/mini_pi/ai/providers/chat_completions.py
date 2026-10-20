@@ -2,13 +2,18 @@ import time
 from typing import Literal
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Iterable,
+)
 
 import httpx
 from pydantic import JsonValue, SecretStr
 
 from ..types import (
     AssistantMessage,
+    ImageContent,
     Message,
     SystemMessage,
     TextContent,
@@ -39,30 +44,64 @@ from .tool_call_buffer import ToolCallBuffer
 from .chat_stream_types import ChatStreamChunk
 
 
-def to_text(content: str | list[TextContent]) -> str:
+def to_text(content: str | Iterable[TextContent | ImageContent]) -> str:
     if isinstance(content, str):
         return content
 
     parts: list[str] = []
 
     for block in content:
-        parts.append(block.text)
+        if isinstance(block, TextContent):
+            parts.append(block.text)
+        else:
+            parts.append("[Image attachment]")
 
     return "".join(parts)
 
 
-def to_chat_message(message: Message) -> dict[str, JsonValue]:
-    if isinstance(message,(SystemMessage, UserMessage)):
+def image_part(block: ImageContent) -> dict[str, JsonValue]:
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:{block.mime_type};base64,{block.data}"},
+    }
+
+
+def to_chat_message(
+    message: Message, *, supports_images: bool = False
+) -> dict[str, JsonValue]:
+    if isinstance(message, SystemMessage):
         return {
             "role": message.role,
             "content": to_text(message.content)
         }
 
-    if isinstance(message,ToolResultMessage):
+    if isinstance(message, UserMessage):
+        if isinstance(message.content, str):
+            return {"role": "user", "content": message.content}
+        has_images = any(isinstance(block, ImageContent) for block in message.content)
+        if not has_images:
+            return {"role": "user", "content": to_text(message.content)}
+        if not supports_images:
+            return {
+                "role": "user",
+                "content": to_text(message.content) + "\n[Images omitted: this model configuration does not support images.]",
+            }
+        parts: list[JsonValue] = []
+        for block in message.content:
+            if isinstance(block, TextContent):
+                parts.append({"type": "text", "text": block.text})
+            else:
+                parts.append(image_part(block))
+        return {"role": "user", "content": parts}
+
+    if isinstance(message, ToolResultMessage):
+        text = to_text(message.content)
+        if not supports_images and any(isinstance(block, ImageContent) for block in message.content):
+            text += "\n[Image omitted: this model configuration does not support images.]"
         return {
             "role": "tool",
-            "tool_call_id": message.tool_call_id,    
-            "content": to_text(message.content),
+            "tool_call_id": message.tool_call_id,
+            "content": text,
         }
 
     if isinstance(message, AssistantMessage):
@@ -94,6 +133,10 @@ def to_chat_message(message: Message) -> dict[str, JsonValue]:
                     "Unsupported assistant content type"
                 )
 
+        if message.stop_reason == "length":
+            diagnostic = message.error_message or "本条回复因长度限制提前结束，内容不完整。"
+            text_parts.append(f"\n\n[运行时提示：{diagnostic}]")
+
         result: dict[str, JsonValue] = {
             "role": "assistant",
             "content": "".join(text_parts),
@@ -116,8 +159,30 @@ def build_chat_request(
 
     messages: list[JsonValue] = []
 
-    for message in context.messages:
-        messages.append(to_chat_message(message))
+    pending_images: list[JsonValue] = []
+    for index, message in enumerate(context.messages):
+        messages.append(to_chat_message(message, supports_images=model.supports_images))
+        if isinstance(message, ToolResultMessage) and model.supports_images:
+            pending_images.extend(
+                image_part(block)
+                for block in message.content
+                if isinstance(block, ImageContent)
+            )
+            last_tool_result = (
+                index + 1 == len(context.messages)
+                or not isinstance(context.messages[index + 1], ToolResultMessage)
+            )
+            if pending_images and last_tool_result:
+                # All tool replies in a batch must precede the synthetic user
+                # image message, matching pi's Chat Completions conversion.
+                messages.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Attached image(s) from tool results:"},
+                        *pending_images,
+                    ],
+                })
+                pending_images = []
 
     body: dict[str, JsonValue] = {
         "model": model.id,
@@ -339,6 +404,7 @@ async def stream_assistant_events(
             )
 
         reason: Literal["stop", "length", "toolUse"]
+        truncated_tool_calls = finish_reason == "length" and bool(tool_buffers)
 
         if finish_reason == "tool_calls":
             if not tool_buffers:
@@ -360,7 +426,18 @@ async def stream_assistant_events(
             reason = "toolUse"
 
         else:
-            if tool_buffers:
+            if truncated_tool_calls:
+                names = ", ".join(
+                    buffer.tool_call.name or "unknown"
+                    for buffer in tool_buffers.values()
+                )
+                message.error_message = (
+                    f"工具参数生成时回复被截断（{names}）。"
+                    "本条回复中的工具调用均未执行。"
+                    "请提高 --max-output-tokens 后重试，"
+                    "或将较大的文件分批写入。"
+                )
+            elif tool_buffers:
                 raise RuntimeError(
                     "Tool calls did not finish normally: "
                     f"{finish_reason}"
@@ -376,12 +453,21 @@ async def stream_assistant_events(
                     partial=message,
                 )
 
-            elif isinstance(block, ToolCall):
+            elif isinstance(block, ToolCall) and not truncated_tool_calls:
                 yield ToolCallEndEvent(
                     content_index=content_index,
                     tool_call=block,
                     partial=message,
                 )
+
+        if truncated_tool_calls:
+            # A length stop cannot authorize execution, even when one call in
+            # the batch happens to contain parseable JSON. Keep only text in
+            # the committed history, so no orphan or partial call is replayed.
+            # Close text blocks before removing calls to preserve event indices.
+            message.content = [
+                block for block in message.content if isinstance(block, TextContent)
+            ]
 
         message.stop_reason = reason
 
@@ -399,4 +485,6 @@ async def stream_assistant_events(
             error=message,
         )
 
-    
+    finally:
+        if isinstance(data_stream, AsyncGenerator):
+            await data_stream.aclose()
