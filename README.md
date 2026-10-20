@@ -1,6 +1,8 @@
-# mini-pi
+# citrus-code
 
 **带初学者用 Python，一步步重写一个 mini 版 pi coding agent。**
+
+> 项目原名 mini-pi，现更名为 citrus-code。仓库名和克隆目录已经变更；当前 Python 包名（`src/mini_pi/`）、命令行 `mini-pi`、`MINI_PI_*` 环境变量和 `.mini-pi/` 会话目录暂未改名，文中命令与路径以实际代码为准。
 
 这是一个持续实现中的学习项目，参考 [pi](https://github.com/earendil-works/pi) 的核心设计思路，用 Python 理解模型调用、流式事件、工具执行和 Agent 运行时如何协作。
 
@@ -78,7 +80,7 @@ uv run mini-pi --resume
 安装为用户级命令，开发期间采用可编辑模式：
 
 ```powershell
-uv tool install --editable "D:\project\mini-pi"
+uv tool install --editable "D:\project\citrus-code"
 
 # 在目标项目中运行，默认以当前目录作为工作目录
 cd D:\project\poirot
@@ -120,7 +122,7 @@ mini-pi --cwd "D:\project\poirot" --resume latest --max-output-tokens 65536
 ## 项目结构
 
 ```text
-mini-pi/
+citrus-code/
 ├── src/mini_pi/
 │   ├── config.py                 # 从环境变量加载连接配置
 │   ├── __main__.py               # python -m mini_pi 入口
@@ -184,8 +186,8 @@ mini-pi/
 需要 Python 3.12 或更新版本，以及 [uv](https://docs.astral.sh/uv/)。以下命令从仓库根目录执行。
 
 ```powershell
-git clone https://github.com/big-orange947/mini-pi.git
-cd mini-pi
+git clone https://github.com/big-orange947/citrus-code.git
+cd citrus-code
 uv sync --locked
 ```
 
