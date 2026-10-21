@@ -1,4 +1,4 @@
-# mini-pi 项目约定
+# citrus-code 项目约定
 
 - 使用 uv 管理 Python 环境和依赖。
 - 模型协议相关代码放在 ai 层。

@@ -3,20 +3,20 @@ import time
 
 import httpx
 
-from mini_pi.ai.events import DoneEvent, ErrorEvent, TextDeltaEvent
+from citrus_code.ai.events import DoneEvent, ErrorEvent, TextDeltaEvent
 
-from mini_pi.ai.providers.chat_completions import (
+from citrus_code.ai.providers.chat_completions import (
     build_chat_request,
     stream_chat_data,
     stream_assistant_events,
 )
-from mini_pi.ai.types import (
+from citrus_code.ai.types import (
     ModelContext,
     ModelOptions,
     ModelSpec,
     UserMessage,
 )
-from mini_pi.config import load_connection_config
+from citrus_code.config import load_connection_config
 
 
 async def main() -> None:

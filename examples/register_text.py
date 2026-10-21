@@ -1,10 +1,10 @@
 import asyncio
 import time
 
-from mini_pi.ai.completion import complete
-from mini_pi.ai.providers.fake import FakeProvider
-from mini_pi.ai.registry import ProviderRegistry
-from mini_pi.ai.types import (
+from citrus_code.ai.completion import complete
+from citrus_code.ai.providers.fake import FakeProvider
+from citrus_code.ai.registry import ProviderRegistry
+from citrus_code.ai.types import (
     ModelContext,
     TextContent,
     UserMessage,

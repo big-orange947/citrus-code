@@ -4,12 +4,12 @@ import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from mini_pi.ai.types import AssistantMessage, TextContent, UserMessage
-from mini_pi.coding.session import SessionManager
+from citrus_code.ai.types import AssistantMessage, TextContent, UserMessage
+from citrus_code.coding.session import SessionManager
 
 
 def main() -> None:
-    with TemporaryDirectory(prefix="mini-pi-session-") as directory:
+    with TemporaryDirectory(prefix="citrus-code-session-") as directory:
         path = Path(directory) / "session.jsonl"
         session = SessionManager.create(cwd=Path.cwd(), file_path=path)
         session.append_model_change(provider="fake", model_id="fake-text")

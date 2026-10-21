@@ -1,8 +1,8 @@
 import asyncio
 from pathlib import Path
 
-from mini_pi.agent.types import AgentTool
-from mini_pi.coding.tools.read import ReadTool
+from citrus_code.agent.types import AgentTool
+from citrus_code.coding.tools.read import ReadTool
 
 
 async def main() -> None:

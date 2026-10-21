@@ -1,10 +1,10 @@
 import asyncio
 from pathlib import Path
 
-from mini_pi.agent.tool_runner import ToolRunner
-from mini_pi.ai.types import ToolCall
-from mini_pi.coding.tools.read import ReadTool
-from mini_pi.coding.tools.write import WriteTool
+from citrus_code.agent.tool_runner import ToolRunner
+from citrus_code.ai.types import ToolCall
+from citrus_code.coding.tools.read import ReadTool
+from citrus_code.coding.tools.write import WriteTool
 
 
 async def main() -> None:

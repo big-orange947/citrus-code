@@ -1,10 +1,10 @@
 import asyncio
 import time
 
-from mini_pi.ai.events import DoneEvent, TextDeltaEvent
-from mini_pi.ai.provider import Provider
-from mini_pi.ai.providers.fake import FakeProvider
-from mini_pi.ai.types import ModelContext, UserMessage
+from citrus_code.ai.events import DoneEvent, TextDeltaEvent
+from citrus_code.ai.provider import Provider
+from citrus_code.ai.providers.fake import FakeProvider
+from citrus_code.ai.types import ModelContext, UserMessage
 
 
 async def main() -> None:

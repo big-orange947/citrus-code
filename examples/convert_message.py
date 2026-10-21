@@ -1,8 +1,8 @@
 import json
 import time
 
-from mini_pi.ai.providers.chat_completions import to_chat_message
-from mini_pi.ai.types import (
+from citrus_code.ai.providers.chat_completions import to_chat_message
+from citrus_code.ai.types import (
     AssistantMessage,
     TextContent,
     ToolCall,

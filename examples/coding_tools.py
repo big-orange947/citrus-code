@@ -5,13 +5,13 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from mini_pi.agent.tool_runner import ToolRunner
-from mini_pi.ai.types import ToolCall
-from mini_pi.coding.tools import create_all_tools
+from citrus_code.agent.tool_runner import ToolRunner
+from citrus_code.ai.types import ToolCall
+from citrus_code.coding.tools import create_all_tools
 
 
 async def main(shell: str | None) -> None:
-    with tempfile.TemporaryDirectory(prefix="mini-pi-example-") as directory:
+    with tempfile.TemporaryDirectory(prefix="citrus-code-example-") as directory:
         cwd = Path(directory)
         runner = ToolRunner(tools=list(create_all_tools(cwd).values()))
         print("工具：", ", ".join(tool.name for tool in runner.get_definitions()))
@@ -35,7 +35,7 @@ async def main(shell: str | None) -> None:
             ToolCall(id="grep_1", name="grep", arguments={"pattern": "return", "glob": "*.py"}),
         ]
         if shell is not None:
-            command = "printf 'mini-pi shell ready\\n'" if shell == "bash" else "Write-Output 'mini-pi shell ready'"
+            command = "printf 'citrus-code shell ready\\n'" if shell == "bash" else "Write-Output 'citrus-code shell ready'"
             calls.append(ToolCall(id="shell_1", name=shell, arguments={"command": command, "timeout": 10}))
 
         for call in calls:

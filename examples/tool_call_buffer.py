@@ -1,5 +1,5 @@
-from mini_pi.ai.providers.chat_stream_types import ChatToolCallDelta
-from mini_pi.ai.providers.tool_call_buffer import ToolCallBuffer
+from citrus_code.ai.providers.chat_stream_types import ChatToolCallDelta
+from citrus_code.ai.providers.tool_call_buffer import ToolCallBuffer
 
 
 def main() -> None:

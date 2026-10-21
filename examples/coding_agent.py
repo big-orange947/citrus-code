@@ -6,18 +6,18 @@ from pathlib import Path
 
 import httpx
 
-from mini_pi.agent.agent import Agent
-from mini_pi.agent.events import (
+from citrus_code.agent.agent import Agent
+from citrus_code.agent.events import (
     AgentEndEvent,
     ModelEvent,
     ToolExecutionEndEvent,
     ToolExecutionStartEvent,
 )
-from mini_pi.ai.events import TextDeltaEvent
-from mini_pi.ai.providers.deepseek import DeepSeekProvider
-from mini_pi.ai.types import ModelOptions, ModelSpec, TextContent
-from mini_pi.coding.tools import create_tools
-from mini_pi.config import load_connection_config
+from citrus_code.ai.events import TextDeltaEvent
+from citrus_code.ai.providers.deepseek import DeepSeekProvider
+from citrus_code.ai.types import ModelOptions, ModelSpec, TextContent
+from citrus_code.coding.tools import create_tools
+from citrus_code.config import load_connection_config
 
 
 async def main(prompt: str, shell: str) -> None:

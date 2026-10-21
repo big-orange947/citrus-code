@@ -1,7 +1,19 @@
 [project]
-name = "mini-pi"
+name = "citrus-code"
 version = "0.1.0"
+description = "A small Python coding agent inspired by pi, built as a learning project."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
+keywords = ["coding-agent", "agent", "cli", "learning", "deepseek"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "httpx>=0.28.1",
     "prompt-toolkit==3.0.53",
@@ -9,9 +21,18 @@ dependencies = [
     "rich==14.2.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/big-orange947/citrus-code"
+Issues = "https://github.com/big-orange947/citrus-code/issues"
+Documentation = "https://github.com/big-orange947/citrus-code#readme"
+
 [build-system]
 requires = ["uv_build==0.11.14"]
 build-backend = "uv_build"
 
 [project.scripts]
-mini-pi = "mini_pi.cli:main"
+citrus = "citrus_code.cli:main"
+
+[tool.uv.build-backend]
+module-name = "citrus_code"
+source-exclude = ["/demo", "/.citrus-code", "/.env", "/.env.*"]

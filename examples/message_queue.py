@@ -1,7 +1,7 @@
 import time
 
-from mini_pi.agent.message_queue import PendingMessageQueue
-from mini_pi.ai.types import UserMessage
+from citrus_code.agent.message_queue import PendingMessageQueue
+from citrus_code.ai.types import UserMessage
 
 
 def main() -> None:

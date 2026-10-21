@@ -3,10 +3,10 @@ import time
 
 import httpx
 
-from mini_pi.ai.completion import complete
-from mini_pi.ai.providers.deepseek import DeepSeekProvider
-from mini_pi.ai.registry import ProviderRegistry
-from mini_pi.ai.types import (
+from citrus_code.ai.completion import complete
+from citrus_code.ai.providers.deepseek import DeepSeekProvider
+from citrus_code.ai.registry import ProviderRegistry
+from citrus_code.ai.types import (
     ModelContext,
     ModelOptions,
     ModelSpec,
@@ -15,7 +15,7 @@ from mini_pi.ai.types import (
     ToolCall,
     ToolDefinition,
 )
-from mini_pi.config import load_connection_config
+from citrus_code.config import load_connection_config
 
 
 async def main() -> None:

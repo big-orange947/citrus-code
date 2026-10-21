@@ -1,11 +1,11 @@
 import asyncio
 from pathlib import Path
 
-from mini_pi.agent.hooks import AgentHooks
-from mini_pi.agent.tool_runner import ToolRunner
-from mini_pi.agent.types import ToolRunResult
-from mini_pi.ai.types import TextContent, ToolCall
-from mini_pi.coding.tools.read import ReadTool
+from citrus_code.agent.hooks import AgentHooks
+from citrus_code.agent.tool_runner import ToolRunner
+from citrus_code.agent.types import ToolRunResult
+from citrus_code.ai.types import TextContent, ToolCall
+from citrus_code.coding.tools.read import ReadTool
 
 
 class DemoToolHooks(AgentHooks):

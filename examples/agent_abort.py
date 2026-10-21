@@ -1,12 +1,12 @@
 import asyncio
 
-from mini_pi.agent.agent import Agent
-from mini_pi.agent.events import (
+from citrus_code.agent.agent import Agent
+from citrus_code.agent.events import (
     AgentEndEvent,
     ModelEvent,
 )
-from mini_pi.ai.events import TextDeltaEvent
-from mini_pi.ai.providers.fake import FakeProvider
+from citrus_code.ai.events import TextDeltaEvent
+from citrus_code.ai.providers.fake import FakeProvider
 
 
 async def main() -> None:

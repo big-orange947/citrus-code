@@ -9,7 +9,7 @@
 ```python
 from pathlib import Path
 
-from mini_pi.coding.tools import (
+from citrus_code.coding.tools import (
     create_all_tools,
     create_coding_tools,
     create_read_only_tools,
@@ -25,6 +25,16 @@ windows = create_tools(cwd, ("read", "powershell", "edit", "write"))
 
 将列表传入 `Agent(tools=...)` 或 `ToolRunner(tools=...)` 即可。全部工具通过同一个
 ToolRunner 执行，沿用现有工具 Hooks 和错误转换。工厂只创建对象，不启动进程。
+
+## 可替换执行操作
+
+八个工具均支持注入 operations。文件访问、命令执行和搜索分别由
+FileOperations、ShellOperations、SearchOperations 提供；默认使用本机实现。
+工厂接受包含三类实现的 ToolOperations，单个工具也可以单独注入对应接口。
+参数校验、编辑算法、输出截断和主循环仍由原有代码负责。
+
+接口、路径映射、取消、完整日志保存和权限 Hook 的边界见
+[工具执行操作说明](tool-operations.md)。当前仅提供本机后端与替换接口，尚未接入实际沙箱。
 
 ## 参数与行为
 
@@ -59,6 +69,23 @@ Python 标准库生成的统一差异格式，没有复制 pi 带行号的专用
 `write` 和 `edit` 共用每文件互斥锁。同一进程中同一路径的修改串行执行，
 不同文件仍可并行。锁在实际文件操作的线程中持有，避免等待协程取消后锁提前释放。
 这是进程内协调，不提供跨进程文件锁，也不保证磁盘写入失败时的事务回滚。
+
+## PowerShell 命令传递
+
+优先使用 PATH 中的 pwsh，缺失时使用 Windows PowerShell。每次调用启动独立进程，
+变量与 cd 不会传给下一次调用，相对路径始终从工具配置的工作目录开始解析。
+
+命令原文写入 UTF-8 临时脚本文件，由短启动命令读取为脚本块后执行，避免把整段
+多行源码直接放进 Windows 命令行造成引号丢失或长度超限。输出编码在解析命令之前
+设置为 UTF-8；临时命令文件在调用结束后删除，工具错误包含实际 shell 路径。
+PowerShell 命令默认启用 `$ErrorActionPreference = 'Stop'`，使未显式处理的 cmdlet
+错误停止当前脚本并返回失败。最后一条外部命令失败时保留其非零退出码；外部程序
+往 stderr 写日志本身不等于失败。
+
+这一处理不能修复模型原本生成的错误语法。为兼容 Windows PowerShell 5.1，提示中
+要求不使用 Bash heredoc、`&&` 或 `||`，也不能用反斜杠转义 PowerShell 引号。
+复杂 Python 或 JavaScript 应先用 write 写成脚本，再调用 `python 文件.py` 或
+`node 文件.js`，减少 PowerShell 和外部程序之间的多层引号解析。
 
 ## 输出控制
 

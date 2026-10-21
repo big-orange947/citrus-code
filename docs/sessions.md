@@ -18,8 +18,8 @@ uv run python examples/session_storage.py
 import time
 from pathlib import Path
 
-from mini_pi.ai.types import UserMessage
-from mini_pi.coding.session import SessionManager
+from citrus_code.ai.types import UserMessage
+from citrus_code.coding.session import SessionManager
 
 path = Path("sessions/example.jsonl")
 
@@ -72,7 +72,7 @@ session.save(Path("sessions/another-session.jsonl"))
 
 ## 文件与错误处理
 
-使用 UTF-8 JSONL：每行一个 JSON 对象。第一条非空记录为 `session` 文件头，其后可以是 `message`、`model_change`、`compaction` 和 `cursor`。这是 mini-pi 自己的 v1 格式，不支持直接读写 pi 的会话文件。用户消息可带 `taskStart`，记录当前任务的起点。
+使用 UTF-8 JSONL：每行一个 JSON 对象。第一条非空记录为 `session` 文件头，其后可以是 `message`、`model_change`、`compaction` 和 `cursor`。这是 citrus-code 自己的 v1 格式，不支持直接读写 pi 的会话文件。用户消息可带 `taskStart`，记录当前任务的起点。
 
 - 写入前完成数据构造，写入后执行 flush 和 fsync，再更新内存中的当前节点。
 - 加载时检查记录格式、版本、重复 ID、父节点和分支选择目标。父节点必须已经出现，因此不能形成环。

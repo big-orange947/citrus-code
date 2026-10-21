@@ -4,7 +4,7 @@ from pathlib import Path
 
 import httpx
 
-from mini_pi.agent.events import (
+from citrus_code.agent.events import (
     AgentEndEvent,
     AgentStartEvent,
     ModelEvent,
@@ -12,19 +12,19 @@ from mini_pi.agent.events import (
     ToolExecutionStartEvent,
     TurnStartEvent,
 )
-from mini_pi.agent.loop import agent_loop
-from mini_pi.agent.tool_runner import ToolRunner
-from mini_pi.ai.events import DoneEvent, TextDeltaEvent
-from mini_pi.ai.providers.deepseek import DeepSeekProvider
-from mini_pi.ai.types import (
+from citrus_code.agent.loop import agent_loop
+from citrus_code.agent.tool_runner import ToolRunner
+from citrus_code.ai.events import DoneEvent, TextDeltaEvent
+from citrus_code.ai.providers.deepseek import DeepSeekProvider
+from citrus_code.ai.types import (
     Message,
     ModelOptions,
     ModelSpec,
     SystemMessage,
     UserMessage,
 )
-from mini_pi.coding.tools.read import ReadTool
-from mini_pi.config import load_connection_config
+from citrus_code.coding.tools.read import ReadTool
+from citrus_code.config import load_connection_config
 
 
 async def main() -> None:

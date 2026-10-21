@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="256" viewBox="0 0 960 256" role="img" aria-labelledby="title desc">
+  <title id="title">Citrus Code</title>
+  <desc id="desc">Citrus Code's pixel orange mascot. A small Python coding agent, inspired by pi. Start with the citrus command.</desc>
+  <rect x="1" y="1" width="958" height="254" rx="16" fill="#10110f" stroke="#524137" stroke-width="2"/>
+  <g transform="translate(48 64) scale(16)" shape-rendering="crispEdges">
+    <path fill="#8ea76c" d="M7 0h3v1H7z M6 1h2v1H6z"/>
+    <path fill="#d79570" d="M2 2h8v1H2z M1 3h2v2H1z M4 3h4v2H4z M9 3h2v2H9z M1 5h10v1H1z M2 6h8v1H2z M3 7h6v1H3z"/>
+    <path fill="#1b1b18" d="M3 3h1v2H3z M8 3h1v2H8z"/>
+  </g>
+  <path d="M264 56v144" stroke="#524137"/>
+  <text x="300" y="110" fill="#f0e9e0" font-family="Segoe UI, Arial, sans-serif" font-size="48" font-weight="700">Citrus Code</text>
+  <text x="302" y="147" fill="#a0a39c" font-family="Segoe UI, Arial, sans-serif" font-size="19">A small Python coding agent, inspired by pi.</text>
+  <text x="302" y="195" fill="#d79570" font-family="Consolas, monospace" font-size="22">&gt; citrus</text>
+  <rect x="418" y="176" width="11" height="23" fill="#d79570"/>
+</svg>

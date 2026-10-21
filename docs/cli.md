@@ -10,15 +10,15 @@ CLI 负责组装 Provider、工具、会话存储和终端交互，模型与工�
 uv sync --locked
 
 # 离线交互，不需要 API Key
-uv run mini-pi --fake
+uv run citrus --fake
 
 # 或使用模块入口
-uv run python -m mini_pi --fake
+uv run python -m citrus_code --fake
 ```
 
 新增依赖 `prompt_toolkit` 负责可编辑的异步输入、命令补全和输入期间的输出展示。它不提供 Agent 决策或主循环。依赖版本与间接依赖由 `uv.lock` 锁定。
 
-`Rich` 负责 Markdown、代码高亮和终端排版。更新依赖前先退出旧 CLI：Windows 会锁住正在使用的 `mini-pi.exe`，导致项目入口重新安装失败。退出后执行 `uv sync --locked`，再正常启动。
+`Rich` 负责 Markdown、代码高亮和终端排版。更新依赖前先退出旧 CLI：Windows 会锁住正在使用的 `citrus.exe`，导致项目入口重新安装失败。退出后执行 `uv sync --locked`，再正常启动。
 
 离线模式使用 `FakeProvider`，只生成固定文字，不能完成实际编程任务。它可以用于观察终端输出、排队消息、取消和会话保存。
 
@@ -27,52 +27,68 @@ uv run python -m mini_pi --fake
 将本地源码安装为用户级命令：
 
 ```powershell
-uv tool install --editable "D:\project\mini-pi"
+uv tool install --editable "D:\project\citrus-code"
 ```
 
-uv 会为工具建立独立的 Python 环境，并把 `mini-pi` 入口放进自己的命令目录。使用 `uv tool dir --bin` 查看该目录；如果它不在 PATH 中，执行 `uv tool update-shell` 后重新打开终端。
+uv 会为工具建立独立的 Python 环境，并把 `citrus` 入口放进自己的命令目录。使用 `uv tool dir --bin` 查看该目录；如果它不在 PATH 中，执行 `uv tool update-shell` 后重新打开终端。
 
-`--editable` 表示直接使用该路径的源码。修改 Python 源码后重启 mini-pi 即可，源码目录应保留在原位置。新增或修改依赖时，退出所有全局 mini-pi 进程后执行：
+`--editable` 表示直接使用该路径的源码。修改 Python 源码后重启 citrus 即可，源码目录应保留在原位置。新增或修改依赖时，退出所有全局 citrus 进程后执行：
 
 ```powershell
-uv tool install --editable "D:\project\mini-pi" --reinstall
+uv tool install --editable "D:\project\citrus-code" --reinstall
 ```
 
-工具环境根据 `pyproject.toml` 安装依赖，独立于项目的 `.venv`，此命令不会按项目 `uv.lock` 同步。需要严格使用项目锁文件时，仍可在源码仓库中使用 `uv sync --locked` 和 `uv run mini-pi`。
+工具环境根据 `pyproject.toml` 安装依赖，独立于项目的 `.venv`，此命令不会按项目 `uv.lock` 同步。需要严格使用项目锁文件时，仍可在源码仓库中使用 `uv sync --locked` 和 `uv run citrus`。
 
 工作目录的两种用法：
 
 ```powershell
 # 使用终端当前所在目录
 cd D:\project\poirot
-mini-pi
+citrus
 
-# 保持终端当前目录，指定 mini-pi 的工作目录
-mini-pi --cwd "D:\project\poirot"
+# 保持终端当前目录，指定 citrus 的工作目录
+citrus --cwd "D:\project\poirot"
 
 # 恢复这个项目最近的会话
-mini-pi --cwd "D:\project\poirot" --resume
+citrus --cwd "D:\project\poirot" --resume
 ```
 
-新会话的工具路径以工作目录为基准，项目指令从该目录的 `AGENTS.md` 读取，默认会话保存在该目录的 `.mini-pi/sessions/`。指定目录必须已经存在。恢复会话仍采用会话原工作目录，不能通过 `--cwd` 将历史迁移到另一个项目。
+新会话的工具路径以工作目录为基准，项目指令从该目录的 `AGENTS.md` 读取，默认会话保存在该目录的 `.citrus-code/sessions/`。指定目录必须已经存在。恢复会话仍采用会话原工作目录，不能通过 `--cwd` 将历史迁移到另一个项目。
 
 全局命令仍从启动它的终端读取模型环境变量。`$env:DEEPSEEK_API_KEY = ...` 只对当前 PowerShell 及其子进程有效；安装为全局命令不会自动把它变成持久配置。
 
 ## 界面与 Markdown
 
-欢迎面板包含原创的字符 π 标识、模型、工作目录和常用操作。较宽的终端采用左右分区，较窄时纵向排列。标识与暖色边框都在 `cli/theme.py` 中定义，不依赖图片或网络资源。
+欢迎面板包含原创的像素块柑橘标识、模型、工作目录、上下文窗口大小和常用操作。较宽的终端采用左右分区，较窄时纵向排列。标识与暖色边框都在 `cli/theme.py` 中定义，不依赖图片或网络资源。启动页不展示图像开关、工具列表、项目指令列表、会话路径、压缩阈值或单次输出上限；会话路径、模型输入类型和输出上限仍可通过 `/status` 查看。
+
+欢迎页布局由 `cli/welcome.py` 管理：左侧欢迎语、四行像素角色、模型与目录居中，模型和窗口大小合并为一行；中间有贯穿内容区的竖线，右侧分为“开始使用”和“当前会话”，以横线分隔。叶片为绿色，角色为暖橙色，版本号为灰色。正常宽度下约占 11 行；窄终端改为纵向排列。
+
+交互欢迎页与输入区由同一个 prompt_toolkit 布局管理，不再预先打印欢迎边框。
+终端缩放后按当前列数重新排版，面板宽度上限为 110 列；高度不足时显示紧凑标题，
+优先保留输入区。首次提交任务或命令后收起欢迎页，进入对话。
+布局右侧保留一列空白，避免绘制终端末列时触发额外换行；窗口尺寸约每 0.12 秒检测一次。
+欢迎页使用终端的备用屏幕缓冲区，由 prompt_toolkit 按完整视口绘制。它不进入普通终端
+的滚动历史，避免窗口缩放重排行后留下旧边框和角色碎片。首次提交非空任务或命令后，
+退出备用屏幕并恢复普通终端；后续对话继续使用原来的滚动输出。退出程序时也恢复原屏幕，
+不清理原有滚动历史。空提交仍停留在欢迎页。
 
 输入框和状态栏：
 
+- 输入区使用上下横线、`›` 提示符和闪烁块状光标，不绘制左右边框。光标形状由终端支持情况决定。
+- 输入高度随实际内容变化：空输入或单行只占一行，手动换行和自动折行时增高，删除内容后收回；不占满终端剩余高度。命令菜单独立显示在下横线之后。
 - Enter 发送当前输入；Alt+Enter 或 Ctrl+J 插入换行。
 - 粘贴多行文字后，可继续编辑，再按 Enter 发送。
-- Tab 补全命令；使用历史记录可重新编辑之前的输入。
-- 状态栏展示当前阶段、模型、上次检查的上下文估计和队列状态。
+- 输入 `/` 自动弹出命令列表，显示说明和参数用法；继续输入按前缀筛选。只补全输入开头的命令，不干扰普通文字、路径或命令参数。
+- ↑↓ 或 Tab 选择候选，Enter 确认补全，再按 Enter 执行；需要参数的命令补全后自动加空格。完整手输的命令可直接 Enter 执行，Esc 关闭列表。使用历史记录可重新编辑之前的输入。
+- 状态栏展示当前阶段、模型、上次检查的上下文估计和队列状态。任务运行时显示 `| / - \\` 循环旋转符号和本次任务已用时间。
 - Ctrl+C 保持原有取消/退出行为；空输入时 Ctrl+D 退出。
 
 助手回复渲染标题、粗体、斜体、列表、引用、链接、表格和带语法高亮的代码块。链接保留 URL 文字，便于终端复制。HTML、数学公式和 Mermaid 不提供浏览器式渲染。
 
-流式生成时，输入框上方显示当前 Markdown 预览。预览高度受终端大小限制，长回答只显示末尾；完整回答在生成结束后写入终端滚动历史，不会把预览重复打印一遍。终端少于 12 行时隐藏预览，优先保留输入区，完整回答仍会显示。
+流式生成时，输入框上方显示当前 Markdown 预览。预览高度受终端大小限制，长回答只显示末尾；完整回答在生成结束后写入终端滚动历史，不会把预览重复打印一遍。终端少于 12 行时隐藏预览；展开命令列表时为菜单多留 6 行，空间不足便隐藏预览。输入区和状态栏仍可使用，完整回答仍会显示。
+
+从任务开始等待模型、流式生成、准备工具调用到执行工具，活动指示持续刷新，即使暂时没有新文字也能看到旋转符号。任务正常结束、错误退出或取消收尾后停止动画。交互模式约每 0.12 秒刷新活动状态，Markdown 正文仍按内容和终端尺寸缓存；单次终端任务使用 Rich Live 显示同样的活动信息。
 
 工具调用显示工具名和主要参数，完成后以卡片显示状态、耗时和返回内容。成功结果默认预览前 8 行、最多约 1,800 字符；错误和 `--verbose` 模式展示完整工具返回。这里的展示限制不会更改模型收到的结果或会话文件内容；工具自身的输出截断规则仍然生效。
 
@@ -80,7 +96,7 @@ mini-pi --cwd "D:\project\poirot" --resume
 
 ### 渲染职责
 
-`cli/render.py` 把事件变成 Markdown、工具卡片和状态信息；`cli/preview.py` 将 Rich 渲染结果转换为输入布局中的一块预览。交互模式统一由 prompt_toolkit 管理光标和重绘，普通输出经过 `patch_stdout(raw=True)` 写到输入框上方。单次终端任务才使用 Rich Live，因此不会让两个刷新器同时控制输入区。
+`cli/commands.py` 为帮助和补全提供同一份命令名称、说明和参数用法。`cli/render.py` 把事件变成 Markdown、工具卡片和状态信息；`cli/preview.py` 将 Rich 渲染结果转换为输入布局中的一块预览，并把命令菜单放在下横线后。交互模式统一由 prompt_toolkit 管理光标、动画和重绘。Rich 的输出先进入 `cli/output.py` 的缓冲区，再等待 `run_in_terminal` 暂停输入区、成批写出并重绘，避免在输入刷新过程中直接写终端；其他普通打印仍由 `patch_stdout(raw=True)` 接管。单次终端任务才使用 Rich Live。
 
 ## 使用真实模型
 
@@ -90,14 +106,14 @@ mini-pi --cwd "D:\project\poirot" --resume
 $env:DEEPSEEK_API_KEY = "你的 API Key"
 
 # 可选：使用当前服务实际支持的模型 ID 和地址
-$env:MINI_PI_MODEL = "deepseek-flash"
-$env:MINI_PI_BASE_URL = "https://api.deepseek.com"
+$env:CITRUS_CODE_MODEL = "deepseek-flash"
+$env:CITRUS_CODE_BASE_URL = "https://api.deepseek.com"
 
 # 交互模式，启动后输入任务才调用模型
-uv run mini-pi
+uv run citrus
 
 # 单次任务，完成后退出
-uv run mini-pi "读取 pyproject.toml，说明项目依赖"
+uv run citrus "读取 pyproject.toml，说明项目依赖"
 ```
 
 真实模型模式会使用对应账户的 API 额度，并执行模型提出的可用工具调用。当前命令工具默认无执行超时，模型可以通过工具参数指定超时；Ctrl+C 可以请求取消。
@@ -105,7 +121,7 @@ uv run mini-pi "读取 pyproject.toml，说明项目依赖"
 传入位置参数时，一次只接收一个任务字符串；包含空格的任务请使用引号。也可以通过标准输入传入单次任务：
 
 ```powershell
-Get-Content -Raw task.txt | uv run mini-pi
+Get-Content -Raw task.txt | uv run citrus
 ```
 
 ## 参数
@@ -113,7 +129,7 @@ Get-Content -Raw task.txt | uv run mini-pi
 | 参数 | 作用 |
 | --- | --- |
 | `--cwd PATH` | 新会话的工作目录；恢复时须与原目录匹配 |
-| `--session-dir PATH` | 自定义会话目录，默认 `<工作目录>/.mini-pi/sessions` |
+| `--session-dir PATH` | 自定义会话目录，默认 `<工作目录>/.citrus-code/sessions` |
 | `--resume FILE` | 恢复指定会话文件 |
 | `--resume` / `--resume latest` | 恢复所选会话目录中最后修改的会话 |
 | `--sessions` | 列出该会话目录的文件，无需 API Key |
@@ -125,14 +141,54 @@ Get-Content -Raw task.txt | uv run mini-pi
 | `--model ID` | 新会话的模型；恢复时必须匹配记录中的模型 |
 | `--max-turns N` | 一次 prompt 内的模型调用轮数上限，默认不限制 |
 | `--max-output-tokens N` | 每次模型调用的输出上限，默认 32768；文字、工具参数和文件正文都计入 |
+| `--model-timeout N` | 等待模型响应数据的最长空闲时间，默认 300 秒；不是整项任务的总时限 |
 | `--verbose` | 同时展示成功工具调用的返回文字 |
 
 `--tools read-only` 选择不提供写入或命令工具的组合，不是操作系统沙箱。搜索工具仍需要 `rg` 和 `fd`，见 [工具说明](tools.md)。
 
+## 模型连接错误与命令错误
+
+工具卡片显示“完成”，随后出现“运行错误”，可能是下一次模型请求失败。
+网络异常现在显示异常类型和说明，例如 `ReadTimeout` 表示等待模型响应数据超时，
+不表示已经完成的 PowerShell 命令失败。界面缺少错误详情时也会显示兜底说明。
+
+CLI 的模型连接超时为 30 秒，发送请求超时为 120 秒，读取数据的空闲超时默认
+300 秒。读取超时限制的是两次接收数据之间的等待，不是一次回复或整个任务的总时长。
+需要更长等待时可在启动或恢复时指定：
+
+```powershell
+citrus --cwd "D:\project\tihu" --resume latest --model-timeout 600
+```
+
+调整超时不会修复服务端错误或网络中断。DeepSeekProvider 现在对临时请求错误自动重试，
+最多重试 3 次，加上首次请求共 4 次尝试；默认依次等待 2、4、8 秒。
+HTTP 错误带有整数秒数的 Retry-After 时，等待至少该时长，每次最多等待 30 秒。
+重试期间显示提示、旋转指示和当前次数，Ctrl+C 可取消请求或退避等待。
+
+可重试错误包括连接/读写错误、超时、流提前结束，以及 HTTP 408、429、500、502、503、504。
+鉴权失败、其他参数错误、响应 JSON 或工具参数校验失败、生成长度截断不自动重试。
+只有超过重试次数或遇到不可重试错误才结束本次任务；失败后仍可继续会话。
+重试可能产生额外模型用量，界面累计统计不包含失败尝试未提交的回复。
+
+`RemoteProtocolError: ... incomplete chunked read` 表示模型接口的流式响应还未完整
+接收，连接就已中断。可能来自服务端、代理或网络，单凭异常不能确定具体来源。
+它不等于模型读取超时，增加 `--model-timeout` 不能修复提前关闭的连接。
+此类错误会先自动重试，耗尽次数后显示中文说明和原始错误。每次重试都使用相同的
+请求上下文，重新生成整条回复；清除失败尝试的临时预览，不拼接新旧工具参数。
+此前已完成的工具操作保留，重试层不重新执行这些工具；中断回复中的工具调用
+不执行，错误回复也不追加到正式对话历史。仍然失败时可以直接输入
+“继续刚才的任务，先检查文件的实际状态”，或退出后使用 `--resume` 继续。
+
+任务结束行的耗时及输入/输出 tokens 是本次任务内多轮调用的累计值。
+累计输入超过 1M 不表示某一次请求超过上下文窗口；累计输出超过 32,768 也不表示
+某一次生成超过输出上限。统计只计入正式提交回复中的 usage，断流回复的用量未计入。
+
+PowerShell 的命令传递、引号和外部脚本建议见 [工具说明](tools.md#powershell-命令传递)。
+
 ## 读取本地图片
 
 CLI 对 `deepseek-flash` 及其旧别名 `deepseek-v4-flash`、`deepseek-v4-flash-vision-exp`
-启用图片输入，欢迎区显示“图像已启用”，`/status` 显示模型输入类型。其他模型 ID
+启用图片输入，`/status` 显示模型输入类型。其他模型 ID
 不会自动开启；第三方转发服务也需要支持图片协议。
 
 启动后明确提供图片路径：
@@ -155,33 +211,33 @@ JPEG、GIF 和 WebP；其他格式需先转换，图片大小和尺寸仍受服�
 
 上下文窗口和单次输出上限独立计算。即使采用 1M 上下文窗口，一次回复仍受到 `--max-output-tokens` 限制。`write` 的文件正文和 `edit` 的替换内容都属于模型生成的工具参数，占用同一份输出预算。
 
-CLI 默认输出上限为 32,768 tokens，欢迎区和 `/status` 会显示本次值。较大的 HTML 或其他文件可以显式提高上限，实际可接受值仍由模型服务决定：
+CLI 默认输出上限为 32,768 tokens，`/status` 会显示本次值。较大的 HTML 或其他文件可以显式提高上限，实际可接受值仍由模型服务决定：
 
 ```powershell
-mini-pi --cwd "D:\project\poirot" --max-output-tokens 65536
+citrus --cwd "D:\project\poirot" --max-output-tokens 65536
 
 # 恢复会话并采用新的输出预算
-mini-pi --cwd "D:\project\poirot" --resume latest --max-output-tokens 65536
+citrus --cwd "D:\project\poirot" --resume latest --max-output-tokens 65536
 ```
 
 收到 `finish_reason=length` 时，CLI 显示“回复被截断”。如果这一条回复包含工具参数，整批调用都不执行；即使其中某个调用的 JSON 看似完整，也不单独执行。最终历史保留已生成的文字、usage、length 状态和诊断，不保存可被重放的残缺工具调用。之后再次请求时，会把截断诊断作为运行时提示提供给模型，明确本条回复中的调用未执行。
 
-截断属于本次生成未完成，单次任务退出码为 1。程序不自动拼接残缺 JSON，也不自动增加预算重复请求。重启后可以继续原会话；系统提示会引导模型先写可运行骨架，再分批修改较大文件。
+截断属于本次生成未完成，单次任务退出码为 1。程序不自动拼接残缺 JSON，也不因生成截断自动增加预算重复请求。重启后可以继续原会话；系统提示会引导模型先写可运行骨架，再分批修改较大文件。
 
 ## 会话保存与恢复
 
 ```powershell
 # 查看当前项目保存的会话
-uv run mini-pi --sessions
+uv run citrus --sessions
 
 # 恢复最近会话，继续交互
-uv run mini-pi --resume
+uv run citrus --resume
 
 # 恢复指定会话
-uv run mini-pi --resume "D:\project\mini-pi\.mini-pi\sessions\某个ID.jsonl"
+uv run citrus --resume "D:\project\citrus-code\.citrus-code\sessions\某个ID.jsonl"
 
 # 恢复最近会话并执行一个单次任务
-uv run mini-pi --resume latest "继续，先检查文件的实际状态"
+uv run citrus --resume latest "继续，先检查文件的实际状态"
 ```
 
 `--resume` 的可选参数会占用它后面的一个词，所以单次任务示例明确写出 `latest`。
@@ -198,11 +254,11 @@ uv run mini-pi --resume latest "继续，先检查文件的实际状态"
 
 锁由操作系统持有，CLI 正常退出或进程结束后释放。锁文件会保留供下次复用，不能根据文件存在与否判断会话是否正在使用。该锁保护使用同一入口的 CLI；直接调用存储 API 的其他程序仍须遵守单写入者约定。
 
-默认 `.mini-pi/` 已加入 `.gitignore`。自定义到其他目录的会话需要自行安排版本控制忽略规则。
+默认 `.citrus-code/` 已加入 `.gitignore`。自定义到其他目录的会话需要自行安排版本控制忽略规则。
 
 ## 项目指令
 
-每次启动 CLI，在确定工作目录后读取该目录下的 `AGENTS.md`，并显示加载文件的绝对路径。`--resume` 使用会话原工作目录；`--sessions` 只列文件，不读取项目指令。
+每次启动 CLI，在确定工作目录后读取该目录下的 `AGENTS.md`，将内容及来源路径加入系统提示。`--resume` 使用会话原工作目录；`--sessions` 只列文件，不读取项目指令。
 
 - 以 UTF-8 读取，兼容 UTF-8 BOM；文件内容原样加入提示，并标明来源路径。
 - 文件不存在或只有空白时不添加项目指令；其他读取错误会使启动失败。
@@ -221,7 +277,7 @@ uv run mini-pi --resume latest "继续，先检查文件的实际状态"
 
 本项目目前约定系统消息由应用统一管理。以后增加其他系统指令，应一起交给提示组装函数，否则该 Hook 会替换它们。切换对话分支也使用本次启动的系统提示。直接调用 `Agent` 或 `CodingSession` 的示例不会自动获得 CLI 的加载行为，需要自行传入对应 Hook。
 
-离线模型仍只返回固定文字。启动时显示指令来源可以观察加载情况，但不能证明模型遵守了这些约定。
+离线模型仍只返回固定文字，不能用其回复证明模型遵守了项目约定。
 
 ## 交互操作
 
@@ -246,7 +302,7 @@ uv run mini-pi --resume latest "继续，先检查文件的实际状态"
 
 ## 自动上下文压缩
 
-CLI 默认按 1,000,000 tokens 窗口计算，在模型请求的估计大小达到 600,000 时压缩。启动时显示这项策略；压缩完成后显示前后估计大小，并继续当前任务，无需再次输入“继续”。
+CLI 默认按 1,000,000 tokens 窗口计算，在模型请求的估计大小达到 600,000 时压缩。启动页只显示窗口大小；压缩完成后显示前后估计大小，并继续当前任务，无需再次输入“继续”。
 
 压缩保留当前任务的用户要求，以及最近最多 5 轮完整交互，近期交互的软预算为 100,000 tokens。工具批次收齐后才允许切分，原始调用与结果不能拆开。摘要采用当前模型，不提供工具，必要时分批生成；过程可用 Ctrl+C 取消。失败时保留原上下文，任务以错误或取消收尾。
 

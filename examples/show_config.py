@@ -1,4 +1,4 @@
-from mini_pi.config import load_connection_config
+from citrus_code.config import load_connection_config
 
 
 def main() -> None:

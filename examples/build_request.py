@@ -1,8 +1,8 @@
 import json
 import time
 
-from mini_pi.ai.providers.chat_completions import build_chat_request
-from mini_pi.ai.types import (
+from citrus_code.ai.providers.chat_completions import build_chat_request
+from citrus_code.ai.types import (
     ModelContext,
     ModelOptions,
     ModelSpec,

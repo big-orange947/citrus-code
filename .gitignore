@@ -28,7 +28,7 @@ htmlcov/
 Thumbs.db
 
 # Local CLI conversations, launch settings, and writer locks
-.mini-pi/
+.citrus-code/
 
 # Local experiments, excluded from version control
 /demo/

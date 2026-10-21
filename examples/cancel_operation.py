@@ -1,6 +1,6 @@
 import asyncio
 
-from mini_pi.agent.cancellation import (
+from citrus_code.agent.cancellation import (
     AgentAbortedError,
     AbortSignal,
     wait_with_abort,
