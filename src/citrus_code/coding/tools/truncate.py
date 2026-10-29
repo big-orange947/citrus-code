@@ -1,3 +1,4 @@
+from typing import Optional
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -13,7 +14,7 @@ class TruncationResult(BaseModel):
 
     content: str
     truncated: bool
-    truncated_by: Literal["lines", "bytes"] | None
+    truncated_by: Optional[Literal['lines', 'bytes']]
     total_lines: int
     total_bytes: int
     output_lines: int

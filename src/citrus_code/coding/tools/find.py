@@ -1,6 +1,7 @@
+from typing import Optional
 import asyncio
 import sys
-from contextlib import aclosing
+from ...compat import aclosing
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
@@ -28,7 +29,7 @@ class FindTool:
         "results, with a 50KB output cap."
     )
 
-    def __init__(self, cwd: Path, *, operations: SearchOperations | None = None) -> None:
+    def __init__(self, cwd: Path, *, operations: Optional[SearchOperations] = None) -> None:
         self._cwd = cwd
         self._ops = LocalSearchOperations() if operations is None else operations
 

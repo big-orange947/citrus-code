@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import tempfile
 from pathlib import Path
@@ -15,7 +16,7 @@ class ShellArguments(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     command: str = Field(min_length=1, description="Shell command to execute.")
-    timeout: float | None = Field(
+    timeout: Optional[float] = Field(
         default=None,
         gt=0,
         allow_inf_nan=False,
@@ -28,7 +29,7 @@ class ShellTool:
     description: str
 
     def __init__(
-        self, cwd: Path, shell_path: str | None = None, *, operations: ShellOperations | None = None,
+        self, cwd: Path, shell_path: Optional[str] = None, *, operations: Optional[ShellOperations] = None,
     ) -> None:
         self._cwd = cwd
         self._shell_path = shell_path
@@ -61,7 +62,7 @@ class ShellTool:
         arguments: dict[str, JsonValue],
     ) -> ToolExecutionResult:
         args = ShellArguments.model_validate(arguments)
-        output_path: Path | None = None
+        output_path: Optional[Path] = None
         keep_output = False
         try:
             # A file sink bounds memory and avoids inherited pipe handles keeping

@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,7 +27,7 @@ class SessionHeader(SessionRecord):
 class SessionEntryBase(SessionRecord):
     id: str = Field(min_length=1)
 
-    parent_id: str | None = Field(
+    parent_id: Optional[str] = Field(
         alias="parentId",
     )
 
@@ -73,28 +74,30 @@ class SessionCursorEntry(SessionRecord):
     """Persist the selected branch tip without creating a new tree node."""
 
     type: Literal["cursor"] = "cursor"
-    entry_id: str | None = Field(alias="entryId")
+    entry_id: Optional[str] = Field(alias="entryId")
     timestamp: int = Field(ge=0)
 
 
 SessionEntry = Annotated[
-    SessionMessageEntry | ModelChangeEntry | CompactionEntry,
+    Union[SessionMessageEntry, ModelChangeEntry, CompactionEntry],
     Field(discriminator="type"),
 ]
 
 
 SessionLogEntry = Annotated[
-    SessionMessageEntry | ModelChangeEntry | CompactionEntry | SessionCursorEntry,
+    Union[SessionMessageEntry, ModelChangeEntry, CompactionEntry, SessionCursorEntry],
     Field(discriminator="type"),
 ]
 
 
 SessionFileEntry = Annotated[
-    SessionHeader
-    | SessionMessageEntry
-    | ModelChangeEntry
-    | CompactionEntry
-    | SessionCursorEntry,
+    Union[
+        SessionHeader,
+        SessionMessageEntry,
+        ModelChangeEntry,
+        CompactionEntry,
+        SessionCursorEntry,
+    ],
     Field(discriminator="type"),
 ]
 
@@ -104,5 +107,5 @@ class SessionContext(BaseModel):
 
     messages: list[Message]
 
-    provider: str | None = None
-    model_id: str | None = None
+    provider: Optional[str] = None
+    model_id: Optional[str] = None

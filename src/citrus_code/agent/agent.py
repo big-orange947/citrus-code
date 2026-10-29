@@ -1,6 +1,7 @@
+from typing import Optional
 import time
 from collections.abc import AsyncGenerator
-from contextlib import aclosing
+from ..compat import aclosing
 
 from ..ai.events import DoneEvent, ErrorEvent, PartialEvent
 from ..ai.provider import Provider
@@ -40,13 +41,13 @@ class Agent:
         provider: Provider,
         model: ModelSpec,
         tools: list[AgentTool],
-        system_prompt: str | None = None,
-        options: ModelOptions | None = None,
-        max_turns: int | None = None,
-        hooks: AgentHooks | None = None,
+        system_prompt: Optional[str] = None,
+        options: Optional[ModelOptions] = None,
+        max_turns: Optional[int] = None,
+        hooks: Optional[AgentHooks] = None,
         steering_mode: QueueMode = "one-at-a-time",
         follow_up_mode: QueueMode = "one-at-a-time",
-        prepare_context: ContextPreparer | None = None,
+        prepare_context: Optional[ContextPreparer] = None,
     ) -> None:
         if max_turns is not None and max_turns < 1:
             raise ValueError("max_turns must be at least 1")
@@ -59,7 +60,7 @@ class Agent:
         self._hooks = hooks
         self._prepare_context = prepare_context
 
-        self._abort_signal: AbortSignal | None = None
+        self._abort_signal: Optional[AbortSignal] = None
 
         self._steering_queue = PendingMessageQueue(
             mode=steering_mode,
@@ -84,6 +85,14 @@ class Agent:
 
         if signal is not None:
             signal.abort()
+
+    def replace_tools(self, tools: list[AgentTool]) -> None:
+        """Replace the executable tool set while no task or queued message is active."""
+        if self.state.is_running or self.has_queued_messages():
+            raise RuntimeError("Cannot replace tools while running or messages are queued")
+        runner = ToolRunner(tools)
+        runner.get_definitions()
+        self._runner = runner
 
     def steer(self, text: str) -> None:
         message = self._create_user_message(text)

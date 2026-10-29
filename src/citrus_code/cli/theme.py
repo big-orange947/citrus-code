@@ -35,6 +35,7 @@ PROMPT_STYLE = Style.from_dict({
     "input.separator": BORDER, "bottom-toolbar": "noreverse",
     "bottom-toolbar.text": MUTED, "status": SUCCESS,
     "status.busy": ACCENT, "status.dim": MUTED,
+    "effort.low": "#98c379", "effort.high": "#e5c07b", "effort.max": "#c6a0f6",
     "completion-menu.completion": "bg:#25272c #c9cdd3",
     "completion-menu.completion.current": f"bg:#45404a {ACCENT}",
     "completion-menu.meta.completion": f"bg:#25272c {MUTED}",
@@ -53,3 +54,11 @@ _CONTROL_SEQUENCES = re.compile(
 def clean_text(text: str) -> str:
     """Keep newlines and tabs, but strip embedded terminal commands."""
     return _CONTROL_SEQUENCES.sub("", text)
+
+
+def format_context_window(tokens: int) -> str:
+    if tokens >= 1_000_000:
+        return f"{tokens / 1_000_000:g}M"
+    if tokens >= 1000:
+        return f"{tokens / 1000:g}k"
+    return str(tokens)

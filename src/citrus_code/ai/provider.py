@@ -1,3 +1,4 @@
+from typing import Optional
 from collections.abc import AsyncIterator
 from typing import Protocol
 
@@ -15,6 +16,6 @@ class Provider(Protocol):
             self,
             model: ModelSpec,
             context: ModelContext,
-            options: ModelOptions | None = None,
+            options: Optional[ModelOptions] = None,
     ) -> AsyncIterator[AssistantMessageEvent]:
         ...

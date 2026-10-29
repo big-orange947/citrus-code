@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import sys
 from pathlib import Path
@@ -25,7 +26,7 @@ class LsTool:
         "have a '/' suffix. Defaults to 500 entries, with a 50KB output cap."
     )
 
-    def __init__(self, cwd: Path, *, operations: FileOperations | None = None) -> None:
+    def __init__(self, cwd: Path, *, operations: Optional[FileOperations] = None) -> None:
         self._cwd = cwd
         self._ops = LocalFileOperations() if operations is None else operations
 

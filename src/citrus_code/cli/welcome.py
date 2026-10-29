@@ -10,10 +10,10 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from .theme import ACCENT, LOGO, clean_text
+from .theme import ACCENT, LOGO, clean_text, format_context_window
 
 
-def build_welcome(cwd: Path, model_id: str, *, resumed: bool, width: int) -> Panel:
+def build_welcome(cwd: Path, model_id: str, *, resumed: bool, width: int, context_window: int = 1_000_000) -> Panel:
     width = max(1, min(width, 110))
     logo = Text(LOGO, style="accent", no_wrap=True)
     logo.stylize("welcome.leaf", 0, LOGO.index("\n"))
@@ -22,7 +22,7 @@ def build_welcome(cwd: Path, model_id: str, *, resumed: bool, width: int) -> Pan
         Text(),
         Align.center(logo),
         Text(
-            f"{clean_text(model_id)} · 1M 上下文",
+            f"{clean_text(model_id)} · {format_context_window(context_window)} 上下文",
             style="muted", justify="center", no_wrap=True, overflow="ellipsis",
         ),
         Text(clean_text(str(cwd)), style="muted", justify="center", no_wrap=True, overflow="ellipsis"),
@@ -52,6 +52,6 @@ def build_welcome(cwd: Path, model_id: str, *, resumed: bool, width: int) -> Pan
         body = Group(left, Rule(style="welcome.divider", characters="─"), right)
     return Panel(
         body,
-        title=Text.assemble((" Citrus Code ", "accent"), ("v0.1.0 ", "muted")),
+        title=Text.assemble((" Citrus Code ", "accent"), ("v1.2.0 ", "muted")),
         title_align="left", border_style=ACCENT, padding=(0, 1), width=width,
     )

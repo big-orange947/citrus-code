@@ -1,24 +1,67 @@
 """A bounded Markdown preview rendered by the existing prompt application."""
+from typing import Optional
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.filters import Condition, has_focus, to_filter
 from prompt_toolkit.formatted_text import ANSI, FormattedText
 from prompt_toolkit.layout import ConditionalContainer, FloatContainer, HSplit, Layout, VSplit, Window
-from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.layout.controls import FormattedTextControl, UIContent, UIControl
 from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.menus import CompletionsMenu, MultiColumnCompletionsMenu
+from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 
 from .commands import is_command_input
 from .render import Console
+from .output import TerminalOutput
+
+
+class TranscriptControl(UIControl):
+    def __init__(self, output: TerminalOutput) -> None:
+        self.output = output
+
+    def create_content(self, width: int, height: Optional[int]) -> UIContent:
+        lines = self.output.transcript_lines()
+        return UIContent(
+            get_line=lines.__getitem__, line_count=len(lines),
+            cursor_position=self.output.transcript_cursor(), show_cursor=False,
+        )
+
+    def preferred_height(self, width, max_available_height, wrap_lines, get_line_prefix):
+        content = self.create_content(width, max_available_height)
+        if not wrap_lines:
+            return min(content.line_count, max_available_height)
+        height = 0
+        for line in range(content.line_count):
+            height += content.get_height_for_line(line, width, get_line_prefix)
+            if height >= max_available_height:
+                return max_available_height
+        return height
+
+
+class TranscriptWindow(Window):
+    def __init__(self, output: TerminalOutput) -> None:
+        super().__init__(
+            TranscriptControl(output),
+            dont_extend_height=True, wrap_lines=True, always_hide_cursor=True,
+        )
+        self.output = output
+
+    def _mouse_handler(self, mouse_event: MouseEvent):
+        if mouse_event.event_type in (MouseEventType.SCROLL_UP, MouseEventType.SCROLL_DOWN):
+            amount = -3 if mouse_event.event_type == MouseEventType.SCROLL_UP else 3
+            self.vertical_scroll = max(0, self.vertical_scroll + amount)
+            self.output.scroll(amount)
+            return None
+        return super()._mouse_handler(mouse_event)
 
 
 class MarkdownPreview:
-    def __init__(self, console: Console, prompt: PromptSession[str]) -> None:
+    def __init__(self, console: Console, prompt: PromptSession[str], output: Optional[TerminalOutput] = None) -> None:
         self.console = console
         self.prompt = prompt
-        self._cache_key: tuple[str, int, int] | None = None
+        self._cache_key: Optional[tuple[str, int, int]] = None
         self._cache = ANSI("")
-        self._welcome_key: tuple[int, bool] | None = None
+        self._welcome_key: Optional[tuple[int, bool]] = None
         self._welcome_cache = ANSI("")
         original = prompt.layout
         self._input_window = original.current_window
@@ -65,6 +108,10 @@ class MarkdownPreview:
                 ]),
                 filter=Condition(lambda: console.shows_welcome and not prompt.app.is_done),
             ),
+            *([ConditionalContainer(
+                TranscriptWindow(output),
+                filter=Condition(lambda: output.managed_screen and not console.shows_welcome),
+            )] if output else []),
             preview,
             Window(height=1, char="─", style="class:input.separator"),
             *root.children[:-1],

@@ -1,3 +1,4 @@
+from typing import Optional
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -27,7 +28,7 @@ def create_local_operations() -> ToolOperations:
     return ToolOperations(files=files, shell=LocalShellOperations(), search=LocalSearchOperations(files))
 
 
-def create_tool(name: str, cwd: Path, *, operations: ToolOperations | None = None) -> AgentTool:
+def create_tool(name: str, cwd: Path, *, operations: Optional[ToolOperations] = None) -> AgentTool:
     if name not in ALL_TOOL_NAMES:
         raise ValueError(f"Unknown built-in tool: {name}")
     ops = create_local_operations() if operations is None else operations
@@ -49,7 +50,7 @@ def create_tool(name: str, cwd: Path, *, operations: ToolOperations | None = Non
 
 
 def create_tools(
-    cwd: Path, names: Iterable[str], *, operations: ToolOperations | None = None,
+    cwd: Path, names: Iterable[str], *, operations: Optional[ToolOperations] = None,
 ) -> list[AgentTool]:
     ops = create_local_operations() if operations is None else operations
     tools: list[AgentTool] = []
@@ -62,14 +63,14 @@ def create_tools(
     return tools
 
 
-def create_coding_tools(cwd: Path, *, operations: ToolOperations | None = None) -> list[AgentTool]:
+def create_coding_tools(cwd: Path, *, operations: Optional[ToolOperations] = None) -> list[AgentTool]:
     return create_tools(cwd, DEFAULT_CODING_TOOLS, operations=operations)
 
 
-def create_read_only_tools(cwd: Path, *, operations: ToolOperations | None = None) -> list[AgentTool]:
+def create_read_only_tools(cwd: Path, *, operations: Optional[ToolOperations] = None) -> list[AgentTool]:
     return create_tools(cwd, READ_ONLY_TOOLS, operations=operations)
 
 
-def create_all_tools(cwd: Path, *, operations: ToolOperations | None = None) -> dict[str, AgentTool]:
+def create_all_tools(cwd: Path, *, operations: Optional[ToolOperations] = None) -> dict[str, AgentTool]:
     ops = create_local_operations() if operations is None else operations
     return {name: create_tool(name, cwd, operations=ops) for name in ALL_TOOL_NAMES}

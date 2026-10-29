@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 from pathlib import Path
 
@@ -12,7 +13,7 @@ class DemoToolHooks(AgentHooks):
     async def before_tool(
         self,
         call: ToolCall,
-    ) -> str | None:
+    ) -> Optional[str]:
         print(
             "[before_tool] 收到调用：",
             call.name,

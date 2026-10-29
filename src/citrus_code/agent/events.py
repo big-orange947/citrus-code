@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -80,18 +81,20 @@ class AgentEndEvent(AgentEventBase):
     ]
 
     messages: list[Message]
-    error_message: str | None = None
+    error_message: Optional[str] = None
 
 
 AgentEvent = Annotated[
-    AgentStartEvent
-    | TurnStartEvent
-    | MessageAcceptedEvent
-    | ModelEvent
-    | AssistantMessageCommittedEvent
-    | ToolExecutionStartEvent
-    | ToolExecutionEndEvent
-    | ContextCompactedEvent
-    | AgentEndEvent,
+    Union[
+        AgentStartEvent,
+        TurnStartEvent,
+        MessageAcceptedEvent,
+        ModelEvent,
+        AssistantMessageCommittedEvent,
+        ToolExecutionStartEvent,
+        ToolExecutionEndEvent,
+        ContextCompactedEvent,
+        AgentEndEvent,
+    ],
     Field(discriminator="type"),
 ]

@@ -86,6 +86,11 @@ session.save(Path("sessions/another-session.jsonl"))
 
 ## 与 Agent 的边界
 
+`CodingSession.switch_model()` 在空闲、无排队消息且工具调用配对完整时准备新的运行时，
+先追加 `model_change` 记录，成功后再替换内存中的 Provider、模型、Hooks 和压缩控制器。
+历史消息、工具与当前分支保持不变。CLI 通过 `/model` 调用这条路径；供应商认证来自配置文件，
+只保存供应商与模型 ID，不把密钥写入会话。
+
 `CodingSession` 已提供初始化和 `prompt`：初始化时恢复消息并检查模型是否匹配，运行时按事件保存用户消息、已提交的助手消息和工具结果。终端等调用方通过 `CodingSession.prompt` 运行需要保存的对话。
 
 加载保证记录结构和树关系有效。`CodingSession.prompt` 在调用模型前检查工具消息配对。CLI 恢复时调用 `session/recovery.py` 中的 `recover_pending_tools(manager)`，为末尾缺少结果的工具调用补充执行状态未知记录，再创建 `CodingSession`。它不执行原工具，不修复损坏 JSON 或历史中间的配对错误。

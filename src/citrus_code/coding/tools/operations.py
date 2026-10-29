@@ -1,4 +1,5 @@
 """Execution contracts, independent of the model-facing tool schemas."""
+from typing import Optional
 
 from collections.abc import AsyncGenerator
 from contextlib import AbstractContextManager
@@ -60,8 +61,8 @@ class ShellOperations(Protocol):
         cwd: Path,
         *,
         shell: ShellName,
-        shell_path: str | None,
-        timeout: float | None,
+        shell_path: Optional[str],
+        timeout: Optional[float],
         output: BinaryIO,
     ) -> ShellResult:
         """Write output to the sink; clean up execution on timeout/cancellation."""
@@ -93,7 +94,7 @@ class SearchOperations(Protocol):
         root: str,
         *,
         cwd: Path,
-        glob: str | None,
+        glob: Optional[str],
         ignore_case: bool,
         literal: bool,
     ) -> AsyncGenerator[SearchMatch, None]:

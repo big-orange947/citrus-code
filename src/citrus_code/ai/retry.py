@@ -1,8 +1,9 @@
 """Retry an uncommitted model response; tool execution stays outside this layer."""
+from typing import Optional
 
 import asyncio
 from collections.abc import AsyncGenerator, Callable
-from contextlib import aclosing
+from ..compat import aclosing
 
 from .events import AssistantMessageEvent, DoneEvent, ErrorEvent, RetryEvent
 
@@ -15,7 +16,7 @@ async def stream_with_retries(
     if max_retries < 0:
         raise ValueError("max_retries must not be negative")
     for attempt in range(max_retries + 1):
-        failure: ErrorEvent | None = None
+        failure: Optional[ErrorEvent] = None
         async with aclosing(create_stream()) as stream:
             async for event in stream:
                 if isinstance(event, ErrorEvent):

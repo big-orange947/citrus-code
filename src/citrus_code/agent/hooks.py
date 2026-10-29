@@ -1,3 +1,4 @@
+from typing import Optional
 from ..ai.types import (
     AssistantMessage,
     ModelContext,
@@ -24,7 +25,7 @@ class AgentHooks:
     async def before_tool(
         self,
         call: ToolCall,
-    ) -> str | None:
+    ) -> Optional[str]:
         """Return a reason to block execution, or None to allow it."""
         return None
 

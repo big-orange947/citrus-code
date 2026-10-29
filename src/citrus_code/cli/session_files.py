@@ -1,4 +1,5 @@
 """CLI session discovery, launch settings, and an OS-held writer lock."""
+from typing import Optional
 
 import os
 from collections.abc import Iterator
@@ -29,7 +30,7 @@ def settings_path(session_path: Path) -> Path:
     return session_path.with_suffix(".settings.json")
 
 
-def load_settings(session_path: Path) -> LaunchSettings | None:
+def load_settings(session_path: Path) -> Optional[LaunchSettings]:
     path = settings_path(session_path)
     if not path.exists():
         return None

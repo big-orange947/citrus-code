@@ -1,4 +1,5 @@
 """Local tool walkthrough in a temporary directory; no model or API key needed."""
+from typing import Optional
 
 import argparse
 import asyncio
@@ -10,7 +11,7 @@ from citrus_code.ai.types import ToolCall
 from citrus_code.coding.tools import create_all_tools
 
 
-async def main(shell: str | None) -> None:
+async def main(shell: Optional[str]) -> None:
     with tempfile.TemporaryDirectory(prefix="citrus-code-example-") as directory:
         cwd = Path(directory)
         runner = ToolRunner(tools=list(create_all_tools(cwd).values()))

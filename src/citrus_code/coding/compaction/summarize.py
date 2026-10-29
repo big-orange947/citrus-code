@@ -1,9 +1,10 @@
 """Bounded, cancellable summary calls without tools or recursive Agent runs."""
+from typing import Optional, Union
 
 import json
 import time
 from collections.abc import AsyncGenerator, Iterator
-from contextlib import aclosing
+from ...compat import aclosing
 
 from ...agent.cancellation import AbortSignal, wait_with_abort
 from ...ai.events import DoneEvent, ErrorEvent
@@ -59,12 +60,14 @@ async def generate_summary(
     summary = ""
     chunk: list[str] = []
     chunk_tokens = 0
+    input_budget = min(SUMMARY_INPUT_TOKENS, max(1, int((model.context_window or 1_000_000) * 0.4)))
+    piece_size = min(32_000, max(1, input_budget // 3))
     for message_text in serialize_messages(messages):
         # A huge user message or code block must not overflow a summary request.
-        for start in range(0, len(message_text), 32_000):
-            piece = message_text[start:start + 32_000]
+        for start in range(0, len(message_text), piece_size):
+            piece = message_text[start:start + piece_size]
             piece_tokens = estimate_text(piece)
-            if chunk and chunk_tokens + piece_tokens > SUMMARY_INPUT_TOKENS:
+            if chunk and chunk_tokens + piece_tokens > input_budget:
                 summary = await _summarize_chunk(provider, model, summary, chunk, signal)
                 chunk = []
                 chunk_tokens = 0
@@ -95,15 +98,15 @@ async def _summarize_chunk(
         SystemMessage(content=SUMMARY_SYSTEM_PROMPT, timestamp=timestamp),
         UserMessage(content=text, timestamp=timestamp),
     ])
-    max_output = min(SUMMARY_OUTPUT_TOKENS, model.max_output_tokens or SUMMARY_OUTPUT_TOKENS)
+    max_output = min(SUMMARY_OUTPUT_TOKENS, model.max_output_tokens or SUMMARY_OUTPUT_TOKENS, max(1, (model.context_window or 1_000_000) // 10))
     stream = provider.stream(model, context, ModelOptions(max_output_tokens=max_output))
     if not isinstance(stream, AsyncGenerator):
         raise TypeError("Summary provider must return a closable async generator")
-    terminal: DoneEvent | ErrorEvent | None = None
+    terminal: Optional[Union[DoneEvent, ErrorEvent]] = None
     async with aclosing(stream):
         while True:
             try:
-                event = await wait_with_abort(anext(stream), signal)
+                event = await wait_with_abort(stream.__anext__(), signal)
             except StopAsyncIteration:
                 break
             if terminal is not None:

@@ -1,4 +1,5 @@
 """Default command operations, including Windows PowerShell transport."""
+from typing import Optional
 
 import asyncio
 import base64
@@ -17,8 +18,8 @@ class LocalShellOperations:
         self,
         command: str,
         shell: ShellName,
-        shell_path: str | None,
-        script_path: Path | None,
+        shell_path: Optional[str],
+        script_path: Optional[Path],
     ) -> list[str]:
         if shell == "powershell":
             executable = shell_path or shutil.which("pwsh") or find_executable("powershell")
@@ -65,11 +66,11 @@ class LocalShellOperations:
         cwd: Path,
         *,
         shell: ShellName,
-        shell_path: str | None,
-        timeout: float | None,
+        shell_path: Optional[str],
+        timeout: Optional[float],
         output: BinaryIO,
     ) -> ShellResult:
-        script_path: Path | None = None
+        script_path: Optional[Path] = None
         try:
             if shell == "powershell":
                 with tempfile.NamedTemporaryFile(
@@ -92,7 +93,7 @@ class LocalShellOperations:
                     code = await process.wait()
                 else:
                     code = await asyncio.wait_for(process.wait(), timeout)
-            except TimeoutError:
+            except asyncio.TimeoutError:
                 timed_out = True
                 await stop_process(process)
                 code = await process.wait()

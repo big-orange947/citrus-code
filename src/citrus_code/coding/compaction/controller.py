@@ -1,4 +1,5 @@
 """Coding policy for automatic compaction and its pending durable checkpoint."""
+from typing import Optional
 
 import time
 from uuid import uuid4
@@ -26,10 +27,12 @@ class CompactionController:
         self._provider = provider
         self._model = model
         self._manager = manager
-        self._pending: CompactionEntry | None = None
-        self.last_estimate: int | None = None
+        self._threshold = int(model.context_window * 0.6) if model.context_window is not None else COMPACTION_THRESHOLD
+        self._recent_budget = min(KEEP_RECENT_TOKENS, max(1, self._threshold // 6))
+        self._pending: Optional[CompactionEntry] = None
+        self.last_estimate: Optional[int] = None
 
-    async def prepare(self, context: ModelContext, signal: AbortSignal) -> PreparedContext | None:
+    async def prepare(self, context: ModelContext, signal: AbortSignal) -> Optional[PreparedContext]:
         self._pending = None
         branch = self._manager.get_branch()
         entries = project_context_entries(branch)
@@ -44,12 +47,12 @@ class CompactionController:
         )
         tokens_before = self._estimate(context, entries, latest)
         self.last_estimate = tokens_before
-        if tokens_before < COMPACTION_THRESHOLD:
+        if tokens_before < self._threshold:
             return None
         if get_pending_tool_calls(ordinary):
             raise ValueError("Compaction requires all tool results to be present")
 
-        retained_ids = select_retained_entries(entries)
+        retained_ids = select_retained_entries(entries, recent_budget=self._recent_budget)
         retained_set = set(retained_ids)
         removed = [item.message for item in entries if item.id not in retained_set]
         if not any(
@@ -60,7 +63,7 @@ class CompactionController:
             raise RuntimeError("Context exceeds 60%, but no older complete interaction can be compacted")
 
         retained_messages = [item.message for item in entries if item.id in retained_set]
-        if estimate_request(replace_system_messages(retained_messages, context)) >= COMPACTION_THRESHOLD:
+        if estimate_request(replace_system_messages(retained_messages, context)) >= self._threshold:
             raise RuntimeError(
                 "Current task requirements and recent interactions alone exceed 60% of the context; "
                 "reduce the task input or oversized tool results"
@@ -80,7 +83,7 @@ class CompactionController:
         messages = [item.message for item in projected]
         request = replace_system_messages(messages, context)
         tokens_after = estimate_request(request)
-        if tokens_after >= min(tokens_before, COMPACTION_THRESHOLD):
+        if tokens_after >= min(tokens_before, self._threshold):
             raise RuntimeError("Summary did not reduce context below the compaction threshold")
         entry.tokens_after = tokens_after
         self._pending = entry
@@ -102,7 +105,7 @@ class CompactionController:
 
     def _estimate(
         self, context: ModelContext, entries: list[ContextMessageEntry],
-        latest: CompactionEntry | None,
+        latest: Optional[CompactionEntry],
     ) -> int:
         stale_ids = set(latest.retained_entry_ids) if latest is not None else set()
         for index in range(len(entries) - 1, -1, -1):
@@ -132,7 +135,7 @@ class CompactionController:
         return estimate_request(context)
 
 
-def select_retained_entries(entries: list[ContextMessageEntry]) -> list[str]:
+def select_retained_entries(entries: list[ContextMessageEntry], *, recent_budget: int = KEEP_RECENT_TOKENS) -> list[str]:
     """Keep a recent suffix of whole model rounds and pin current task users."""
     assistant_indices = [
         index for index, item in enumerate(entries) if isinstance(item.message, AssistantMessage)
@@ -144,7 +147,7 @@ def select_retained_entries(entries: list[ContextMessageEntry]) -> list[str]:
         while end < len(entries) and isinstance(entries[end].message, ToolResultMessage):
             end += 1
         size = sum(estimate_message(item.message) for item in entries[index:end])
-        if start != len(entries) and recent_tokens + size > KEEP_RECENT_TOKENS:
+        if start != len(entries) and recent_tokens + size > recent_budget:
             break
         start = index
         recent_tokens += size

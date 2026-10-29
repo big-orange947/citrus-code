@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from typing import Annotated,Literal
 
 from pydantic import BaseModel,ConfigDict,Field
@@ -63,7 +64,7 @@ class ErrorEvent(BaseModel):
     reason: Literal["error", "aborted"]
     error: AssistantMessage
     retryable: bool = False
-    retry_after_seconds: float | None = Field(default=None, ge=0)
+    retry_after_seconds: Optional[float] = Field(default=None, ge=0)
 
 
 class RetryEvent(BaseModel):
@@ -77,15 +78,17 @@ class RetryEvent(BaseModel):
 
 
 AssistantMessageEvent = Annotated[
-    StartEvent
-    | TextStartEvent
-    | TextDeltaEvent
-    | TextEndEvent
-    | ToolCallStartEvent
-    | ToolCallDeltaEvent
-    | ToolCallEndEvent
-    | DoneEvent
-    | RetryEvent
-    | ErrorEvent,
+    Union[
+        StartEvent,
+        TextStartEvent,
+        TextDeltaEvent,
+        TextEndEvent,
+        ToolCallStartEvent,
+        ToolCallDeltaEvent,
+        ToolCallEndEvent,
+        DoneEvent,
+        RetryEvent,
+        ErrorEvent,
+    ],
     Field(discriminator="type"),
 ]

@@ -11,6 +11,7 @@
 | 项目名称 | Citrus Code |
 | GitHub 仓库 | [big-orange947/citrus-code](https://github.com/big-orange947/citrus-code) |
 | Python 安装包 | `citrus-code` |
+| PyPI 发布 | [citrus-code 1.2.0](https://pypi.org/project/citrus-code/1.2.0/) |
 | 终端命令 | `citrus` |
 | Python 模块 | `citrus_code` |
 | 默认会话目录 | `<工作目录>/.citrus-code/sessions/` |
@@ -19,7 +20,7 @@
 
 适合有 Java 或其他语言基础、正在学习 Python，同时对 Agent 开发有一些了解的读者。项目不使用 LangChain、LangGraph 等 Agent 框架；网络通信和数据校验分别使用 HTTPX 与 Pydantic，其余流程逐步实现。
 
-> 当前已实现模型调用层、ReAct 主循环、Agent 状态、四个 Hooks、参考 pi 的八个内置工具、会话保存与恢复、带 Markdown 的 CLI、AGENTS.md 加载、本地图片读取，以及按 1M 窗口、60% 阈值实现的自动上下文压缩。基础 CLI 已手动运行；新版界面、图片接入和压缩流程仍需进一步交互与真实模型验证。
+> 当前已实现模型调用层、Agent 主循环、Hooks、coding 工具、会话保存与恢复、Markdown CLI、文件配置、多供应商、Skill、MCP，以及上下文压缩。项目持续开发中，部分功能仍需进一步真实模型和交互验证。
 
 ## 学习目标与设计思路
 
@@ -31,15 +32,19 @@
 
 本项目是学习实现，并非 pi 的官方 Python 移植版，也不承诺与其接口和功能完全一致。
 
+配套教程先用第零章介绍 Agent 的基本概念与完整运行过程，再从一次模型调用开始逐步实现。
+见 [教程目录](docs/tutorial/README.md)、[第零章：开始开发 Agent 前，你需要知道什么](docs/tutorial/00-before-you-start.md)
+与 [第一章：第一次模型调用](docs/tutorial/01-first-call.md)。
+
 ## 终端界面与项目标识
 
 Citrus Code 使用自己的绿叶像素橘子作为项目标识，README 和终端欢迎页采用同一角色与配色。
-可复用的透明背景图标位于 [assets/citrus-logo.svg](assets/citrus-logo.svg)，页首横幅位于
-[assets/citrus-banner.svg](assets/citrus-banner.svg)。终端角色直接由字符块绘制，运行时无需加载图片。
+可复用的透明背景图标位于 [assets/citrus-logo.svg](https://github.com/big-orange947/citrus-code/blob/main/assets/citrus-logo.svg)，页首横幅位于
+[assets/citrus-banner.svg](https://github.com/big-orange947/citrus-code/blob/main/assets/citrus-banner.svg)。终端角色直接由字符块绘制，运行时无需加载图片。
 
-CLI 提供居中的像素欢迎页、随输入内容增高的输入栏、闪烁块状光标，以及输入 `/` 时展开的命令列表。
+CLI 提供居中的像素欢迎页、随输入内容增高的输入栏、块状光标，以及输入 `/` 时展开的命令列表。
 任务运行中显示旋转指示，助手回复支持 Markdown 和代码高亮，工具执行结果以卡片呈现。
-欢迎页使用独立终端屏幕，首次发送任务或命令后返回普通终端对话；最近的缩放重绘调整仍待实际交互确认。
+Windows 交互界面使用独立终端屏幕；可用鼠标滚轮或 PgUp/PgDn 查看对话，退出后对话输出会返回普通终端。
 
 ## 当前进度
 
@@ -48,7 +53,10 @@ CLI 提供居中的像素欢迎页、随输入内容增高的输入栏、闪烁�
 | 消息类型 | 系统、用户、助手、工具结果消息；文字块、图片块与工具调用块 |
 | Provider 接口 | 统一模型信息和异步事件流，提供注册与查找 |
 | FakeProvider | 使用预设文字模拟流式响应，便于理解异步生成器 |
-| DeepSeek 接入 | HTTP 请求、SSE 读取、非思考模式、Flash 图片输入、临时错误退避重试、用量统计和错误事件 |
+| DeepSeek 接入 | HTTP 请求、SSE 读取、思考强度选择、Flash 图片输入、临时错误退避重试、用量统计和错误事件 |
+| 多供应商 | 通用 OpenAI 兼容协议、Anthropic Messages 原生协议；支持自定义中转地址、认证和请求参数 |
+| 模型配置 | 全局/项目 JSON 配置，`--config`、`--init-config`、`/model` 选择与重新加载，切换记录随会话保存 |
+| 扩展 | 本地 Skill 发现与 `@` 引用，MCP 服务与工具管理（MCP 需要 Python 3.10+） |
 | 工具调用解析 | 按索引拼接多个工具调用的参数，转换成统一工具事件 |
 | 生成截断处理 | 默认输出上限 32,768 tokens；回复被截断时不执行该回复中的工具调用 |
 | 完整回答接口 | `complete()` 消费事件流并返回最终助手消息 |
@@ -64,19 +72,19 @@ CLI 提供居中的像素欢迎页、随输入内容增高的输入栏、闪烁�
 | CLI | 交互与单次任务、流式输出、运行中追加消息、会话恢复、末尾缺失工具结果修复 |
 | 终端展示 | 原创像素块柑橘标识、简洁欢迎面板、横线输入栏与块状光标、命令提示列表、运行动画、Markdown 流式预览和工具结果卡片 |
 | 项目指令 | 启动时读取工作目录下的 AGENTS.md，通过模型前 Hook 组装当前请求 |
-| 上下文压缩 | 估计达到 600,000 tokens 时生成摘要，保留当前要求及近期完整交互，保存压缩记录 |
+| 上下文压缩 | 估计达到配置窗口的 60% 时生成摘要，默认 1M 窗口对应 600,000 tokens；保留当前要求和完整交互 |
 
 工具名称、主要参数和默认组合参考 pi。实现细节、系统程序依赖、图片能力和取消处理的边界见 [工具说明](https://github.com/big-orange947/citrus-code/blob/main/docs/tools.md)。
 
-可替换执行操作的接口与使用方式见 [工具后端说明](https://github.com/big-orange947/citrus-code/blob/main/docs/tool-operations.md)。这部分是本地源码中的后续开发，已发布的 `0.1.0` 尚不包含它。
+可替换执行操作的接口与使用方式见 [工具后端说明](https://github.com/big-orange947/citrus-code/blob/main/docs/tool-operations.md)，从 `0.1.1` 起提供。
 
 会话存储的接口、文件格式和恢复边界见 [会话说明](https://github.com/big-orange947/citrus-code/blob/main/docs/sessions.md)。带自动保存的任务通过 `CodingSession.prompt()` 运行。命令入口见 [CLI 使用说明](https://github.com/big-orange947/citrus-code/blob/main/docs/cli.md)。
 
-自动压缩策略与失败边界见 [上下文压缩说明](https://github.com/big-orange947/citrus-code/blob/main/docs/compaction.md)。当前固定假设模型支持 1,000,000 tokens；估计达到 60% 时压缩。摘要调用会消耗模型额度。
+自动压缩策略与失败边界见 [上下文压缩说明](https://github.com/big-orange947/citrus-code/blob/main/docs/compaction.md)。窗口由模型配置声明，默认 1M；估计达到 60% 时压缩。摘要调用会消耗模型额度。
 
 ## 快速开始
 
-要体验仓库中的最新功能，可以从源码安装，需要 Python 3.12 或更新版本，以及 [uv](https://docs.astral.sh/uv/)。
+要体验仓库中的最新功能，可以从源码安装，需要 Python 3.9 或更新版本，以及 [uv](https://docs.astral.sh/uv/)。
 先克隆仓库并安装锁定的依赖：
 
 ```powershell
@@ -88,10 +96,12 @@ uv sync --locked
 uv run citrus --fake
 ```
 
-使用真实模型时，在 PowerShell 中配置自己的密钥，再指定要处理的项目：
+使用真实模型时，先生成并编辑配置文件，再指定要处理的项目：
 
 ```powershell
-$env:DEEPSEEK_API_KEY = "替换为你自己的 API Key"
+uv run citrus --init-config
+notepad "$HOME\.citrus-code\settings.json"
+# 在文件中填写 api_key 后启动
 uv run citrus --cwd "D:\project\your-project"
 ```
 
@@ -101,12 +111,12 @@ uv run citrus --cwd "D:\project\your-project"
 
 ## 安装发行版
 
-需要 Python 3.12 或更新版本。以下命令安装已经发布到 PyPI 的 `0.1.0`；仓库中后续的界面、重试和工具后端改动尚未发布，请使用上方的源码安装方式体验。安装包名为 `citrus-code`，启动命令为 `citrus`。
+[PyPI 1.2.0](https://pypi.org/project/citrus-code/1.2.0/) 已发布。需要 Python 3.9 或更新版本；使用 MCP 时需要 Python 3.10 或更新版本。安装包名为 `citrus-code`，启动命令为 `citrus`。旧版 `0.1.0`、`0.1.1` 要求 Python 3.12。
 
 使用 uv 安装：
 
 ```powershell
-uv tool install --python 3.12 citrus-code
+uv tool install --python 3.10 "citrus-code>=1.2.0"
 ```
 
 没有 uv 时，可以使用已安装的 pipx，或通过 pip 安装到当前 Python 环境：
@@ -118,10 +128,21 @@ pipx install citrus-code
 python -m pip install citrus-code
 ```
 
-在 PowerShell 中配置自己的模型密钥并启动：
+已有安装可按自己的安装方式升级：
 
 ```powershell
-$env:DEEPSEEK_API_KEY = "替换为你自己的 API Key"
+uv tool upgrade citrus-code
+# 或
+pipx upgrade citrus-code
+# 或
+python -m pip install --upgrade citrus-code
+```
+
+生成文件配置、填写密钥后启动：
+
+```powershell
+citrus --init-config
+notepad "$HOME\.citrus-code\settings.json"
 citrus --cwd "D:\project\your-project"
 ```
 
@@ -137,7 +158,7 @@ uv sync --locked
 # 离线交互，使用预设文字，不需要 API Key
 uv run citrus --fake
 
-# 设置下文的 DeepSeek 环境变量后，进入真实模型交互
+# 在 settings.json 中配置模型后，进入真实模型交互
 uv run citrus
 
 # 单次任务
@@ -152,12 +173,15 @@ uv run citrus --resume
 
 输入框中 Enter 发送，Alt+Enter 或 Ctrl+J 换行，Tab 补全命令。助手回答支持 Markdown；较长的工具结果默认只展示预览，使用 `--verbose` 启动可查看完整工具返回。升级依赖前先退出正在运行的旧 CLI，避免 Windows 锁住启动程序。
 
-输入 `/` 自动展开带说明的命令列表。输入区使用上下横线和闪烁块状光标，运行时持续显示旋转指示。模型临时断流、超时和部分 HTTP 错误最多自动重试 3 次，默认等待 2、4、8 秒；失败尝试的临时回复清除，已完成的工具结果保留，重试等待可用 Ctrl+C 取消。
+输入 `/` 自动展开带说明的命令列表。输入区使用上下横线和块状光标，运行时持续显示旋转指示。模型临时断流、超时和部分 HTTP 错误最多自动重试 3 次，默认等待 2、4、8 秒；失败尝试的临时回复清除，已完成的工具结果保留，重试等待可用 Ctrl+C 取消。
 
 | 操作 | 命令或按键 |
 | --- | --- |
 | 查看帮助 | `/help` |
 | 查看运行状态和上下文估计 | `/status` |
+| 选择模型或重新读取配置 | `/model`、`/model reload` |
+| 设置 DeepSeek 思考强度 | `/effort`、`/effort low`、`/effort high`、`/effort max` |
+| 查看和管理扩展 | `/skill`、`/mcp` |
 | 查看当前对话 | `/history` |
 | 查看与切换对话分支 | `/tree`、`/checkout ID` |
 | 在当前任务中追加要求 | 运行期间直接输入，或 `/steer 消息` |
@@ -189,7 +213,7 @@ citrus --cwd "D:\project\poirot"
 
 ## 读取本地图片
 
-CLI 为 `deepseek-flash`、`deepseek-v4-flash` 和 `deepseek-v4-flash-vision-exp` 启用图片输入。启动后提供图片路径，并让模型调用 `read`：
+在配置文件的模型条目中设置 `"supports_images": true` 来启用图片输入，初始化的 DeepSeek 示例已开启。启动后提供图片路径，并让模型调用 `read`：
 
 ```text
 请调用 read 读取 D:\screenshots\page.png，先描述图片内容，再分析布局问题。
@@ -218,13 +242,15 @@ citrus --cwd "D:\project\poirot" --resume latest --max-output-tokens 65536
 citrus-code/
 ├── assets/                       # 像素橘子图标与 README 品牌横幅
 ├── src/citrus_code/
-│   ├── config.py                 # 从环境变量加载连接配置
+│   ├── settings.py               # 全局/项目配置、模型目录和凭据读取
+│   ├── config.py                 # DeepSeek 阶段示例的连接配置入口
 │   ├── __main__.py               # python -m citrus_code 入口
 │   ├── cli/                      # 参数、组装、终端输入和事件展示
 │   │   ├── main.py               # 命令参数、应用组装和交互命令
 │   │   ├── terminal.py           # 异步输入、按键和状态栏
 │   │   ├── render.py             # Markdown、工具卡片和事件展示
 │   │   ├── preview.py            # 输入框上方的流式 Markdown 预览
+│   │   ├── models.py             # 配置供应商组装与当前会话模型切换
 │   │   └── theme.py              # 字符标识、配色和终端文字清理
 │   ├── ai/                       # 模型调用层
 │   │   ├── types.py              # 内部消息、模型、上下文和工具定义
@@ -235,6 +261,9 @@ citrus-code/
 │   │   └── providers/
 │   │       ├── fake.py
 │   │       ├── deepseek.py
+│   │       ├── openai_compatible.py
+│   │       ├── anthropic_messages.py
+│   │       ├── transport.py
 │   │       ├── chat_completions.py
 │   │       ├── chat_stream_types.py
 │   │       └── tool_call_buffer.py
@@ -279,6 +308,8 @@ citrus-code/
 
 ## 开发环境与依赖
 
+项目支持 Agent Skills 和 MCP 工具：在输入框输入 `@` 选择 Skill，通过 `/skill`、`/mcp` 查看和管理。发现路径、配置和使用方法见 [Skill 与 MCP](docs/extensions.md)。
+
 源码克隆和首次启动见上方“快速开始”。后续拉取代码或修改依赖后，在仓库根目录同步环境：
 
 ```powershell
@@ -295,6 +326,11 @@ uv sync --locked
 | Pydantic v2 | 数据类型校验、JSON 解析和 JSON Schema 生成 |
 | prompt_toolkit | 异步终端输入、输入编辑和输入期间的输出展示 |
 | Rich | Markdown、代码高亮、欢迎面板、工具卡片和终端排版 |
+| PyYAML | 解析 Skill 的 YAML frontmatter |
+| MCP Python SDK | 连接 stdio 与 Streamable HTTP MCP 服务（Python 3.10 及以上） |
+
+Python 3.9 使用 `prompt_toolkit 3.0.52`，Python 3.10 及以上使用 `3.0.53`，安装时自动选择。
+源码的可空类型和联合类型使用 `Optional`、`Union`，以兼容 Python 3.9。
 
 ## 先运行本地示例
 
@@ -324,9 +360,12 @@ uv run python examples/session_storage.py
 
 ## 配置 DeepSeek
 
-当前连接配置默认使用 DeepSeek 官方服务和 `deepseek-flash` 模型 ID。具体可用模型以 [DeepSeek 官方文档](https://api-docs.deepseek.com/quick_start/pricing/) 为准。
+初始化配置使用 DeepSeek 官方服务和 `deepseek-flash` 模型 ID。模型、地址和密钥都可以在
+`~/.citrus-code/settings.json` 中修改；无需设置环境变量。多供应商、中转站配置和 `/model`
+使用方式见 [模型配置说明](https://github.com/big-orange947/citrus-code/blob/main/docs/models.md)，
+完整示例见 [settings.example.json](https://github.com/big-orange947/citrus-code/blob/main/settings.example.json)。
 
-在运行示例的 PowerShell 终端中设置：
+只有完全没有配置文件时，才支持原有环境变量作为可选回退：
 
 ```powershell
 $env:DEEPSEEK_API_KEY = "替换为你自己的 API Key"
@@ -336,7 +375,7 @@ $env:CITRUS_CODE_MODEL = "deepseek-flash"
 $env:CITRUS_CODE_BASE_URL = "https://api.deepseek.com"
 ```
 
-这些设置作用于当前终端会话及其启动的程序。当前代码只读取进程环境变量，不会自动加载 `.env` 文件。
+配置文件存在时，以文件为准，不依赖这些变量。程序不会自动加载 `.env` 文件。
 
 ```powershell
 # 查看配置；API Key 使用 SecretStr 遮盖显示
@@ -349,7 +388,7 @@ uv run python examples/deepseek_raw_stream.py
 uv run python examples/deepseek_provider.py
 ```
 
-后两个示例会实际调用模型，使用对应账户的 API 额度。当前接入显式关闭思考模式。
+后两个示例会实际调用模型，使用对应账户的 API 额度。阶段示例与 CLI 的模型设置可能不同，请分别查看对应代码和配置说明。
 
 `deepseek_provider.py` 保留为仅演示模型接入的阶段示例。完整主循环见 `agent_state.py`；使用默认 coding 工具执行真实任务的示例为：
 
@@ -366,7 +405,7 @@ Windows 上如需使用 PowerShell，可添加 `--shell powershell`。上述示�
 | 1 | `ai/types.py` | `convert_message.py` | 消息对象、工具定义、实际参数的区别 |
 | 2 | `ai/events.py`、`ai/provider.py`、`providers/fake.py` | `stream_text.py` | `async`、`yield`、`async for` 和事件流 |
 | 3 | `ai/registry.py`、`ai/completion.py` | `register_text.py` | 注册查找与流式接口的包装 |
-| 4 | `config.py`、`providers/chat_completions.py` | `show_config.py`、`build_request.py`、`deepseek_raw_stream.py` | 环境变量、消息转换、HTTP 与 SSE |
+| 4 | `settings.py`、`config.py`、`providers/chat_completions.py` | `show_config.py`、`build_request.py`、`deepseek_raw_stream.py` | 文件配置、消息转换、HTTP 与 SSE |
 | 5 | `providers/tool_call_buffer.py`、`providers/chat_stream_types.py` | `tool_call_buffer.py` | 工具索引、参数片段与完整 JSON 对象 |
 | 6 | `providers/deepseek.py` | `deepseek_provider.py` | 把接入逻辑封装成统一 Provider |
 | 7 | `agent/types.py`、`coding/tools/read.py`、`agent/tool_runner.py` | `read_tool.py`、`tool_runner.py` | 参数校验、实际执行、结果与错误反馈 |
@@ -397,6 +436,7 @@ Windows 上如需使用 PowerShell，可添加 `--shell powershell`。上述示�
 - [x] 第一版 CLI 交互与终端流式展示代码。
 - [x] 原创字符标识、Markdown 渲染、多行输入和状态栏。
 - [x] 用户级命令安装与指定工作目录。
+- [x] 文件配置、OpenAI 兼容/Anthropic 原生接入、中转站配置与 `/model` 会话内选择。
 - [x] Flash 模型通过 read 工具接收本地图片。
 - [x] 可配置模型输出上限，以及截断工具调用的执行保护。
 - [ ] CLI 交互、取消和真实模型集成验证。
@@ -404,7 +444,7 @@ Windows 上如需使用 PowerShell，可添加 `--shell powershell`。上述示�
 - [x] 会话与 Agent 的集成及末尾缺失工具结果的恢复。
 - [x] 启动时加载工作目录下的 AGENTS.md，并用于新会话和恢复会话的模型请求。
 - [ ] 项目指令的父目录查找和运行中重新加载。
-- [x] 1M 窗口下的 60% 自动压缩、近期完整交互保留和压缩记录重建。
+- [x] 配置窗口下的 60% 自动压缩、近期完整交互保留和压缩记录重建；默认沿用 1M 窗口。
 - [ ] 上下文压缩的自动化与真实模型验证。
 - [ ] 将各阶段整理成配套教程文档。
 

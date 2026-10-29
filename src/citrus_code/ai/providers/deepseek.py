@@ -1,3 +1,4 @@
+from typing import Optional
 from collections.abc import AsyncIterator
 
 import httpx
@@ -57,7 +58,7 @@ class DeepSeekProvider:
         self,
         model: ModelSpec,
         context: ModelContext,
-        options: ModelOptions | None = None,
+        options: Optional[ModelOptions] = None,
     ) -> AsyncIterator[AssistantMessageEvent]:
         if model != self._model:
             raise ValueError(

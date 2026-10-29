@@ -1,6 +1,7 @@
-import os
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from .settings import SettingsStore, provider_credentials
 
 
 class ModelConnectionConfig(BaseModel):
@@ -13,22 +14,11 @@ class ModelConnectionConfig(BaseModel):
 
 
 def load_connection_config() -> ModelConnectionConfig:
-    api_key = os.getenv("DEEPSEEK_API_KEY")
-
-    if api_key is None or not api_key.strip():
-        raise ValueError(
-            "Please set the DEEPSEEK_API_KEY environment variable"
-        )
-
+    settings = SettingsStore(Path.cwd()).load()
+    model = settings.resolve(provider_id="deepseek")
+    provider = settings.providers[model.provider]
+    key, _ = provider_credentials(provider)
     return ModelConnectionConfig(
-        provider_id="deepseek",
-        model_id=os.getenv(
-            "CITRUS_CODE_MODEL",
-            "deepseek-flash",
-        ),
-        base_url=os.getenv(
-            "CITRUS_CODE_BASE_URL",
-            "https://api.deepseek.com",
-        ),
-        api_key=SecretStr(api_key),
+        provider_id=model.provider, model_id=model.id,
+        base_url=model.base_url, api_key=key,
     )

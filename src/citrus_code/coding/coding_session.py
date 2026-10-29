@@ -1,7 +1,8 @@
+from typing import Optional
 import time
 
 from collections.abc import AsyncGenerator
-from contextlib import aclosing
+from ..compat import aclosing
 from ..agent.agent import Agent
 from ..agent.hooks import AgentHooks
 from ..agent.types import AgentTool
@@ -35,10 +36,10 @@ class CodingSession:
         model: ModelSpec,
         tools: list[AgentTool],
         session_manager: SessionManager,
-        system_prompt: str | None = None,
-        options: ModelOptions | None = None,
-        max_turns: int | None = None,
-        hooks: AgentHooks | None = None,
+        system_prompt: Optional[str] = None,
+        options: Optional[ModelOptions] = None,
+        max_turns: Optional[int] = None,
+        hooks: Optional[AgentHooks] = None,
         auto_compact: bool = True,
     ) -> None:
         if provider.id != model.provider:
@@ -59,6 +60,11 @@ class CodingSession:
                 )
         self._provider_id = model.provider
         self._model_id = model.id
+        self._model = model.model_copy(deep=True)
+        self._tools = list(tools)
+        self._options = options
+        self._max_turns = max_turns
+        self._hooks = hooks
         self.compaction = (
             CompactionController(provider, model, session_manager)
             if auto_compact else None
@@ -96,6 +102,44 @@ class CodingSession:
         self.agent.replace_messages(
             restored_context.messages
         )
+
+    @property
+    def model(self) -> ModelSpec:
+        return self._model.model_copy(deep=True)
+
+    def replace_tools(self, tools: list[AgentTool]) -> None:
+        if self.is_running or self.has_queued_messages():
+            raise ValueError("更新工具需要当前任务结束且没有排队消息。")
+        self.agent.replace_tools(tools)
+        self._tools = list(tools)
+
+    def switch_model(
+        self, provider: Provider, model: ModelSpec,
+        *, options: Optional[ModelOptions] = None, hooks: Optional[AgentHooks] = None,
+    ) -> None:
+        """Prepare a new runtime, commit the selection, then publish it in memory."""
+        if self.is_running or self.has_queued_messages():
+            raise ValueError("切换模型需要当前任务结束且没有排队消息；可先 /abort 或 /clear-queue。")
+        if provider.id != model.provider:
+            raise ValueError("The provider does not match the model")
+        context = self.session_manager.build_context()
+        if context.messages != self.agent.state.messages or get_pending_tool_calls(context.messages):
+            raise ValueError("切换前需要恢复一致且完整的会话上下文。")
+        selected_options = options if options is not None else self._options
+        selected_hooks = hooks if hooks is not None else self._hooks
+        compaction = CompactionController(provider, model, self.session_manager) if self.compaction is not None else None
+        agent = Agent(
+            provider=provider, model=model, tools=self._tools,
+            options=selected_options, max_turns=self._max_turns, hooks=selected_hooks,
+            prepare_context=compaction.prepare if compaction is not None else None,
+        )
+        agent.replace_messages(context.messages)
+        # A failed append must leave the running provider and model unchanged.
+        self.session_manager.append_model_change(model.provider, model.id)
+        self.agent, self.compaction = agent, compaction
+        self._provider_id, self._model_id = model.provider, model.id
+        self._model = model.model_copy(deep=True)
+        self._options, self._hooks = selected_options, selected_hooks
 
 
     async def prompt(
@@ -136,7 +180,7 @@ class CodingSession:
                         "while the agent was running"
                     )
 
-                message: Message | None = None
+                message: Optional[Message] = None
                 task_start = False
 
                 if isinstance(event, AgentStartEvent):

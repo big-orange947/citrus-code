@@ -1,3 +1,4 @@
+from typing import Optional
 import time
 
 from pydantic import JsonValue
@@ -47,9 +48,9 @@ class ToolRunner:
     async def execute(
         self,
         call: ToolCall,
-        hooks: AgentHooks | None = None,
+        hooks: Optional[AgentHooks] = None,
     ) -> ToolRunResult:
-        block_reason: str | None = None
+        block_reason: Optional[str] = None
 
         # 1. 执行前，询问 Hook 是否允许这次调用。
         if hooks is not None:

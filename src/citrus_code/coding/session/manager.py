@@ -1,4 +1,5 @@
 """Session tree and context reconstruction with optional JSONL persistence."""
+from typing import Optional
 
 import time
 from pathlib import Path
@@ -31,8 +32,8 @@ class SessionManager:
         self._entries: list[SessionEntry] = []
         self._records: list[SessionLogEntry] = []
         self._by_id: dict[str, SessionEntry] = {}
-        self._leaf_id: str | None = None
-        self._store: JsonlSessionStore | None = None
+        self._leaf_id: Optional[str] = None
+        self._store: Optional[JsonlSessionStore] = None
         self._lock = RLock()
 
     @classmethod
@@ -69,12 +70,12 @@ class SessionManager:
             return self._header.model_copy(deep=True)
 
     @property
-    def leaf_id(self) -> str | None:
+    def leaf_id(self) -> Optional[str]:
         with self._lock:
             return self._leaf_id
 
     @property
-    def file_path(self) -> Path | None:
+    def file_path(self) -> Optional[Path]:
         with self._lock:
             return self._store.path if self._store is not None else None
 
@@ -143,7 +144,7 @@ class SessionManager:
         self._leaf_id = stored.id
         return stored.id
 
-    def checkout(self, entry_id: str | None) -> None:
+    def checkout(self, entry_id: Optional[str]) -> None:
         with self._lock:
             if entry_id is not None and entry_id not in self._by_id:
                 raise ValueError(f"Session entry does not exist: {entry_id}")
@@ -162,7 +163,7 @@ class SessionManager:
         with self._lock:
             return self._get_branch(self._leaf_id)
 
-    def _get_branch(self, entry_id: str | None) -> list[SessionEntry]:
+    def _get_branch(self, entry_id: Optional[str]) -> list[SessionEntry]:
         if entry_id is not None and entry_id not in self._by_id:
             raise ValueError(f"Session entry does not exist: {entry_id}")
 
@@ -183,14 +184,14 @@ class SessionManager:
         with self._lock:
             return project_context_entries(self._get_branch(self._leaf_id))
 
-    def build_context_at(self, entry_id: str | None) -> SessionContext:
+    def build_context_at(self, entry_id: Optional[str]) -> SessionContext:
         """Preview a branch without moving the cursor or writing records."""
         with self._lock:
             return self._build_context(entry_id)
 
-    def _build_context(self, entry_id: str | None) -> SessionContext:
-        provider: str | None = None
-        model_id: str | None = None
+    def _build_context(self, entry_id: Optional[str]) -> SessionContext:
+        provider: Optional[str] = None
+        model_id: Optional[str] = None
         branch = self._get_branch(entry_id)
         for entry in branch:
             if isinstance(entry, ModelChangeEntry):

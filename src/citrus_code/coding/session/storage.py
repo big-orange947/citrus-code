@@ -1,4 +1,5 @@
 """Synchronous JSONL persistence, intended for one writer per session file."""
+from typing import Optional
 
 import os
 from dataclasses import dataclass
@@ -71,7 +72,7 @@ class JsonlSessionStore:
         path: Path,
     ) -> tuple["JsonlSessionStore", SessionHeader, list[tuple[int, SessionLogEntry]]]:
         path = path.expanduser().resolve()
-        header: SessionHeader | None = None
+        header: Optional[SessionHeader] = None
         records: list[tuple[int, SessionLogEntry]] = []
 
         with _IO_LOCK:

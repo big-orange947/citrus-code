@@ -1,8 +1,9 @@
 """Default search operations using host ripgrep/fd and file operations."""
+from typing import Optional
 
 import base64
 from collections.abc import AsyncGenerator
-from contextlib import aclosing
+from ...compat import aclosing
 import os
 from pathlib import Path
 
@@ -15,8 +16,8 @@ from .processes import command_lines, find_executable
 
 class _RgText(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    text: str | None = None
-    bytes: str | None = None
+    text: Optional[str] = None
+    bytes: Optional[str] = None
 
     def value(self) -> str:
         if self.text is not None:
@@ -28,21 +29,21 @@ class _RgText(BaseModel):
 
 class _RgData(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    path: _RgText | None = None
-    lines: _RgText | None = None
-    line_number: int | None = None
+    path: Optional[_RgText] = None
+    lines: Optional[_RgText] = None
+    line_number: Optional[int] = None
 
 
 class _RgEvent(BaseModel):
     model_config = ConfigDict(extra="ignore")
     type: str
-    data: _RgData | None = None
+    data: Optional[_RgData] = None
 
 
 class LocalSearchOperations:
     """Host search programs; changing only files does not sandbox these programs."""
 
-    def __init__(self, files: FileOperations | None = None) -> None:
+    def __init__(self, files: Optional[FileOperations] = None) -> None:
         self._files = LocalFileOperations() if files is None else files
 
     def resolve_path(self, value: str, cwd: Path) -> str:
@@ -81,7 +82,7 @@ class LocalSearchOperations:
         root: str,
         *,
         cwd: Path,
-        glob: str | None,
+        glob: Optional[str],
         ignore_case: bool,
         literal: bool,
     ) -> AsyncGenerator[SearchMatch, None]:

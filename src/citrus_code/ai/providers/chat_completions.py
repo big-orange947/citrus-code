@@ -1,3 +1,4 @@
+from typing import Optional, Union
 import time
 from typing import Literal
 
@@ -42,13 +43,10 @@ from ..events import (
 from .tool_call_buffer import ToolCallBuffer
 
 from .chat_stream_types import ChatStreamChunk
+from .transport import IncompleteStreamError, endpoint_url, request_headers, stream_sse
 
 
-class IncompleteStreamError(RuntimeError):
-    """The response ended before its required completion markers arrived."""
-
-
-def to_text(content: str | Iterable[TextContent | ImageContent]) -> str:
+def to_text(content: Union[str, Iterable[Union[TextContent, ImageContent]]]) -> str:
     if isinstance(content, str):
         return content
 
@@ -64,6 +62,8 @@ def to_text(content: str | Iterable[TextContent | ImageContent]) -> str:
 
 
 def image_part(block: ImageContent) -> dict[str, JsonValue]:
+    if block.mime_type not in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
+        return {"type": "text", "text": f"[图片未发送：不支持 {block.mime_type}；请转换为 PNG、JPEG、GIF 或 WebP。]"}
     return {
         "type": "image_url",
         "image_url": {"url": f"data:{block.mime_type};base64,{block.data}"},
@@ -71,7 +71,7 @@ def image_part(block: ImageContent) -> dict[str, JsonValue]:
 
 
 def to_chat_message(
-    message: Message, *, supports_images: bool = False
+    message: Message, *, supports_images: bool = False, include_reasoning: bool = False
 ) -> dict[str, JsonValue]:
     if isinstance(message, SystemMessage):
         return {
@@ -148,6 +148,8 @@ def to_chat_message(
 
         if tool_calls:
             result["tool_calls"] = tool_calls
+        if include_reasoning and message.reasoning_content is not None:
+            result["reasoning_content"] = message.reasoning_content
 
         return result
 
@@ -156,7 +158,7 @@ def to_chat_message(
 def build_chat_request(
         model: ModelSpec,
         context: ModelContext,
-        options: ModelOptions | None = None,
+        options: Optional[ModelOptions] = None,
 ) -> dict[str, JsonValue]:
     if not context.messages:
         raise ValueError("At least one message is required")
@@ -165,7 +167,10 @@ def build_chat_request(
 
     pending_images: list[JsonValue] = []
     for index, message in enumerate(context.messages):
-        messages.append(to_chat_message(message, supports_images=model.supports_images))
+        messages.append(to_chat_message(
+            message, supports_images=model.supports_images,
+            include_reasoning=isinstance(message, AssistantMessage) and message.provider == model.provider and message.model == model.id,
+        ))
         if isinstance(message, ToolResultMessage) and model.supports_images:
             pending_images.extend(
                 image_part(block)
@@ -229,55 +234,19 @@ async def stream_chat_data(
         model: ModelSpec,
         api_key: SecretStr,
         body: dict[str, JsonValue],
+        *,
+        headers: Optional[dict[str, str]] = None,
+        auth_type: str = "bearer",
 ) -> AsyncIterator[str]:
-    url=model.base_url.rstrip("/") + "/chat/completions"
-
-
-    headers = {
-        "Authorization": f"Bearer {api_key.get_secret_value()}",
-        "Accept": "text/event-stream",
-    }
-
-
-    async with client.stream(
-        "POST",
-        url,
-        headers=headers,
-        json=body,
-    ) as response:
-        response.raise_for_status()
-        response.encoding = "utf-8"
-
-        data_lines: list[str] = []
-
-        async for line in response.aiter_lines():
-            if line == "":
-                if not data_lines:
-                    continue
-
-                data = "\n".join(data_lines)
-                data_lines.clear()
-
-                if data == "[DONE]":
-                    return 
-
-                yield data
-                continue
-
-            if line.startswith(":"):
-                continue
-
-            field, _, value = line.partition(":")
-
-            if field == "data":
-                if value.startswith(" "):
-                    value = value[1:]
-
-                data_lines.append(value)
-
-        raise IncompleteStreamError(
-            "The chat stream ended without a [DONE] marker"
-        )
+    stream = stream_sse(client, endpoint_url(model.base_url, model.api), request_headers(api_key, auth_type, headers or {}), body)
+    try:
+        async for data in stream:
+            if data == "[DONE]":
+                return
+            yield data
+        raise IncompleteStreamError("The chat stream ended without a [DONE] marker")
+    finally:
+        await stream.aclose()
 
 async def stream_assistant_events(
     model: ModelSpec,
@@ -293,13 +262,11 @@ async def stream_assistant_events(
         timestamp=int(time.time() * 1000),
     )
 
-    text_block: TextContent | None = None
+    text_block: Optional[TextContent] = None
     text_content_index = 0
     tool_buffers: dict[int, ToolCallBuffer] = {}
 
-    finish_reason: Literal[
-        "stop", "length", "tool_calls"
-    ] | None = None
+    finish_reason: Optional[Literal['stop', 'length', 'tool_calls']] = None
 
     yield StartEvent(partial=message)
 
@@ -319,6 +286,9 @@ async def stream_assistant_events(
                     total_tokens=chunk.usage.total_tokens,
                     cache_read_tokens=(
                         chunk.usage.prompt_cache_hit_tokens
+                        if chunk.usage.prompt_cache_hit_tokens is not None
+                        else (chunk.usage.prompt_tokens_details.cached_tokens
+                              if chunk.usage.prompt_tokens_details is not None else None)
                     ),
                 )
 
@@ -331,9 +301,7 @@ async def stream_assistant_events(
                 delta = choice.delta
 
                 if delta.reasoning_content:
-                    raise NotImplementedError(
-                        "Thinking content is not implemented yet"
-                    )
+                    message.reasoning_content = (message.reasoning_content or "") + delta.reasoning_content
 
                 if finish_reason is not None:
                     if delta.content or delta.tool_calls:
@@ -486,7 +454,7 @@ async def stream_assistant_events(
             httpx.TimeoutException, httpx.NetworkError,
             httpx.RemoteProtocolError, IncompleteStreamError,
         ))
-        retry_after: float | None = None
+        retry_after: Optional[float] = None
         if isinstance(exc, httpx.HTTPStatusError):
             retryable = exc.response.status_code in (408, 429, 500, 502, 503, 504)
             header = exc.response.headers.get("Retry-After", "").strip()

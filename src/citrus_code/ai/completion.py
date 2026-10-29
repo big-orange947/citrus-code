@@ -1,3 +1,4 @@
+from typing import Optional
 from .events import DoneEvent, ErrorEvent
 from .provider import Provider
 from .types import (
@@ -12,7 +13,7 @@ async def complete(
         provider: Provider,
         model: ModelSpec,
         context: ModelContext,
-        options: ModelOptions | None = None,
+        options: Optional[ModelOptions] = None,
 ) -> AssistantMessage:
     async for event in provider.stream(
         model,

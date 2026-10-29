@@ -1,10 +1,11 @@
+from typing import Optional, Union
 import time
 from collections.abc import (
     AsyncGenerator,
     Callable,
     Iterator,
 )
-from contextlib import aclosing
+from ..compat import aclosing
 from typing import Literal
 
 from ..ai.events import DoneEvent, ErrorEvent
@@ -62,7 +63,7 @@ def _accept_messages(
 def _finish_pending_tools(
     history: list[Message],
     pending_calls: list[ToolCall],
-    started_call_id: str | None,
+    started_call_id: Optional[str],
     reason: Literal["aborted", "error"],
 ) -> Iterator[AgentEvent]:
     """Give every unfinished call a corresponding result."""
@@ -120,13 +121,13 @@ async def agent_loop(
     model: ModelSpec,
     messages: list[Message],
     tool_runner: ToolRunner,
-    options: ModelOptions | None = None,
-    max_turns: int | None = None,
-    hooks: AgentHooks | None = None,
-    abort_signal: AbortSignal | None = None,
-    get_steering_messages: MessageReader | None = None,
-    get_follow_up_messages: MessageReader | None = None,
-    prepare_context: ContextPreparer | None = None,
+    options: Optional[ModelOptions] = None,
+    max_turns: Optional[int] = None,
+    hooks: Optional[AgentHooks] = None,
+    abort_signal: Optional[AbortSignal] = None,
+    get_steering_messages: Optional[MessageReader] = None,
+    get_follow_up_messages: Optional[MessageReader] = None,
+    prepare_context: Optional[ContextPreparer] = None,
 ) -> AsyncGenerator[AgentEvent, None]:
     if max_turns is not None and max_turns < 1:
         raise ValueError("max_turns must be at least 1")
@@ -146,7 +147,7 @@ async def agent_loop(
     turn = 0
 
     pending_calls: list[ToolCall] = []
-    started_call_id: str | None = None
+    started_call_id: Optional[str] = None
 
     # 上一轮结束时，可能已经为下一轮接纳了队列消息。
     skip_steering_poll = False
@@ -224,7 +225,7 @@ async def agent_loop(
 
             signal.raise_if_aborted()
 
-            terminal: DoneEvent | ErrorEvent | None = None
+            terminal: Optional[Union[DoneEvent, ErrorEvent]] = None
 
             stream = provider.stream(
                 model=model,
@@ -242,7 +243,7 @@ async def agent_loop(
                 while True:
                     try:
                         event = await wait_with_abort(
-                            operation=anext(stream),
+                            operation=stream.__anext__(),
                             signal=signal,
                         )
                     except StopAsyncIteration:

@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 from pathlib import Path
 
@@ -39,7 +40,7 @@ class WriteTool:
         "Use this tool for new files or complete rewrites."
     )
 
-    def __init__(self, cwd: Path, *, operations: FileOperations | None = None) -> None:
+    def __init__(self, cwd: Path, *, operations: Optional[FileOperations] = None) -> None:
         self._cwd = cwd
         self._ops = LocalFileOperations() if operations is None else operations
 

@@ -1,4 +1,5 @@
 """Application-supplied context preparation at a model-call boundary."""
+from typing import Optional
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -16,5 +17,5 @@ class PreparedContext:
 
 
 ContextPreparer = Callable[
-    [ModelContext, AbortSignal], Awaitable[PreparedContext | None]
+    [ModelContext, AbortSignal], Awaitable[Optional[PreparedContext]]
 ]

@@ -1,6 +1,7 @@
+from typing import Optional
 import asyncio
 import sys
-from contextlib import aclosing
+from ...compat import aclosing
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
@@ -17,7 +18,7 @@ class GrepArguments(BaseModel):
 
     pattern: str = Field(description="Search pattern: regex, or a literal string when literal is true.")
     path: str = Field(default=".", description="File or directory to search.")
-    glob: str | None = Field(default=None, description="Filter files, e.g. '*.py'.")
+    glob: Optional[str] = Field(default=None, description="Filter files, e.g. '*.py'.")
     ignore_case: bool = Field(default=False, alias="ignoreCase")
     literal: bool = False
     context: int = Field(default=0, ge=0, description="Context lines before and after each match.")
@@ -32,7 +33,7 @@ class GrepTool:
         "is 100 matching lines, with a 50KB output cap and 500 characters per line."
     )
 
-    def __init__(self, cwd: Path, *, operations: SearchOperations | None = None) -> None:
+    def __init__(self, cwd: Path, *, operations: Optional[SearchOperations] = None) -> None:
         self._cwd = cwd
         self._ops = LocalSearchOperations() if operations is None else operations
 

@@ -1,0 +1,33 @@
+{
+  "default_model": "deepseek/deepseek-flash",
+  "providers": {
+    "deepseek": {
+      "name": "DeepSeek",
+      "api": "chat-completions",
+      "base_url": "https://api.deepseek.com",
+      "api_key": "",
+      "extra_body": {"thinking": {"type": "enabled"}, "reasoning_effort": "max"},
+      "models": [
+        {"id": "deepseek-flash", "name": "DeepSeek V4.1 Flash", "context_window": 1000000, "max_output_tokens": 32768, "supports_images": true}
+      ]
+    },
+    "relay": {
+      "name": "我的中转站",
+      "api": "chat-completions",
+      "base_url": "https://your-relay.example/v1",
+      "api_key": "",
+      "models": [
+        {"id": "your-model-id", "context_window": 128000, "max_output_tokens": 8192}
+      ]
+    },
+    "anthropic": {
+      "name": "Anthropic",
+      "api": "anthropic-messages",
+      "base_url": "https://api.anthropic.com",
+      "api_key": "",
+      "models": [
+        {"id": "your-claude-model-id", "context_window": 200000, "max_output_tokens": 8192, "supports_images": true}
+      ]
+    }
+  }
+}

@@ -3,7 +3,7 @@
 import json
 import math
 
-from ...ai.types import ImageContent, Message, ModelContext, SystemMessage, ToolCall
+from ...ai.types import AssistantMessage, ImageContent, Message, ModelContext, SystemMessage, ToolCall
 
 
 CONTEXT_WINDOW = 1_000_000
@@ -20,6 +20,8 @@ def estimate_text(text: str) -> int:
 
 def estimate_message(message: Message) -> int:
     tokens = 8  # Approximate role and message framing overhead.
+    if isinstance(message, AssistantMessage) and message.reasoning_content:
+        tokens += estimate_text(message.reasoning_content)
     if isinstance(message.content, str):
         return tokens + estimate_text(message.content)
     for block in message.content:

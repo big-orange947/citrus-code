@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from typing import Annotated,Literal
 
 from pydantic import BaseModel,ConfigDict,Field,JsonValue
@@ -19,7 +20,7 @@ class ImageContent(BaseModel):
 
 
 ToolContent = Annotated[
-    TextContent | ImageContent,
+    Union[TextContent, ImageContent],
     Field(discriminator="type"),
 ]
 
@@ -35,7 +36,7 @@ class ToolCall(BaseModel):
 class SystemMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     role: Literal["system"] = "system"
-    content: str | list[TextContent]
+    content: Union[str, list[TextContent]]
     timestamp: int 
 
 
@@ -43,7 +44,7 @@ class UserMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Literal["user"] = "user"
-    content: str | list[ToolContent]
+    content: Union[str, list[ToolContent]]
     timestamp: int
 
 
@@ -74,12 +75,12 @@ class Usage(BaseModel):
     output_tokens: int = Field(ge=0)
     total_tokens: int = Field(ge=0)
 
-    cache_read_tokens: int | None = Field(default=None,ge=0)
-    cache_write_tokens: int | None = Field(default=None,ge=0)
+    cache_read_tokens: Optional[int] = Field(default=None,ge=0)
+    cache_write_tokens: Optional[int] = Field(default=None,ge=0)
 
 
 AssistantContent = Annotated[
-    TextContent | ToolCall,
+    Union[TextContent, ToolCall],
     Field(discriminator="type"),
 ]
 
@@ -94,14 +95,15 @@ class AssistantMessage(BaseModel):
     provider: str
     model: str
 
-    usage: Usage | None
+    usage: Optional[Usage]
     stop_reason: StopReason
-    error_message: str | None = None
+    error_message: Optional[str] = None
+    reasoning_content: Optional[str] = None
     timestamp: int
 
 
 Message = Annotated[
-    SystemMessage | UserMessage | AssistantMessage | ToolResultMessage,
+    Union[SystemMessage, UserMessage, AssistantMessage, ToolResultMessage],
     Field(discriminator="role"),
 ]
 
@@ -115,8 +117,8 @@ class ModelSpec(BaseModel):
     api: str
     base_url: str
 
-    context_window: int | None = Field(default=None,gt=0)
-    max_output_tokens: int | None = Field(default=None,gt=0)
+    context_window: Optional[int] = Field(default=None,gt=0)
+    max_output_tokens: Optional[int] = Field(default=None,gt=0)
     supports_images: bool = False
 
 
@@ -138,5 +140,5 @@ class ModelContext(BaseModel):
 class ModelOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    max_output_tokens: int | None = Field(default=None,gt=0)
-    temperature: float | None = None
+    max_output_tokens: Optional[int] = Field(default=None,gt=0)
+    temperature: Optional[float] = None

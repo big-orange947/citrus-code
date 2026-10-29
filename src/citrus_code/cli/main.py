@@ -1,4 +1,5 @@
 """Parse CLI options and assemble providers, tools, storage, and terminal UI."""
+from typing import Optional
 
 import argparse
 import asyncio
@@ -11,18 +12,17 @@ from pathlib import Path
 
 import httpx
 
-from ..ai.provider import Provider
-from ..ai.providers.deepseek import DEEPSEEK_VISION_MODEL_IDS, DeepSeekProvider
 from ..ai.providers.fake import FakeProvider
-from ..ai.types import ModelOptions, ModelSpec
 from ..coding.coding_session import CodingSession
-from ..coding.compaction.tokens import CONTEXT_WINDOW
-from ..coding.context_hooks import SystemPromptHooks
 from ..coding.project_context import load_project_context
 from ..coding.session import SessionManager
 from ..coding.session.recovery import recover_pending_tools
+from ..coding.extensions import ExtensionPreferences
+from ..coding.mcp import MCPManager
+from ..coding.skills import SkillManager
 from ..coding.tools import READ_ONLY_TOOLS, create_tools
-from ..config import load_connection_config
+from ..settings import SettingsStore
+from .models import ModelController
 from .prompts import build_system_prompt
 from .render import Console
 from .session_files import (
@@ -38,19 +38,22 @@ from .terminal import InteractiveTerminal, cancel_on_sigint, run_turn
 
 @dataclass(frozen=True)
 class Options:
-    prompt: str | None
-    cwd: Path | None
-    session_dir: Path | None
-    resume: str | None
+    prompt: Optional[str]
+    cwd: Optional[Path]
+    session_dir: Optional[Path]
+    resume: Optional[str]
     sessions: bool
     fake: bool
-    shell: ShellName | None
-    tools: str | None
-    model: str | None
-    max_turns: int | None
+    shell: Optional[ShellName]
+    tools: Optional[str]
+    model: Optional[str]
+    max_turns: Optional[int]
     max_output_tokens: int
     model_timeout: int
     verbose: bool
+    config: Optional[Path]
+    init_config: bool
+    provider: Optional[str]
 
 
 def positive_integer(value: str) -> int:
@@ -60,7 +63,7 @@ def positive_integer(value: str) -> int:
     return number
 
 
-def parse_options(argv: list[str] | None) -> Options:
+def parse_options(argv: Optional[list[str]]) -> Options:
     parser = argparse.ArgumentParser(
         prog="citrus",
         description="Python coding agent；不传任务进入交互模式，传入任务则单次运行。",
@@ -74,6 +77,9 @@ def parse_options(argv: list[str] | None) -> Options:
     parser.add_argument("--shell", choices=("bash", "powershell"), help="新会话的命令工具；Windows 默认 powershell，其他平台默认 bash")
     parser.add_argument("--tools", choices=("coding", "read-only", "all"), help="新会话的工具组合，默认 coding")
     parser.add_argument("--model", help="模型 ID；恢复时须与会话记录匹配")
+    parser.add_argument("--provider", help="配置文件中的供应商 ID；也可直接使用 --model 供应商/模型ID")
+    parser.add_argument("--config", type=Path, help="指定 JSON 模型配置文件，替代默认配置路径")
+    parser.add_argument("--init-config", action="store_true", help="创建示例模型配置后退出；不覆盖已有文件")
     parser.add_argument("--max-turns", type=positive_integer, help="本次运行的模型调用轮数上限，默认不限制")
     parser.add_argument(
         "--max-output-tokens", type=positive_integer, default=32768,
@@ -88,7 +94,7 @@ def parse_options(argv: list[str] | None) -> Options:
     if args.sessions and (args.prompt is not None or args.resume is not None):
         parser.error("--sessions 请单独使用，可搭配 --cwd 和 --session-dir")
     prompt = args.prompt
-    if not args.sessions and prompt is None:
+    if not args.sessions and not args.init_config and prompt is None:
         if not sys.stdin.isatty():
             prompt = sys.stdin.read().strip()
             if not prompt:
@@ -100,11 +106,11 @@ def parse_options(argv: list[str] | None) -> Options:
     return Options(
         prompt, args.cwd, args.session_dir, args.resume, args.sessions, args.fake,
         args.shell, args.tools, args.model, args.max_turns, args.max_output_tokens,
-        args.model_timeout, args.verbose,
+        args.model_timeout, args.verbose, args.config, args.init_config, args.provider,
     )
 
 
-def choose_tools(options: Options, default_shell: ShellName | None = None) -> LaunchSettings:
+def choose_tools(options: Options, default_shell: Optional[ShellName] = None) -> LaunchSettings:
     shell: ShellName = options.shell or default_shell or ("powershell" if os.name == "nt" else "bash")
     if shell == "powershell" and os.name != "nt":
         raise ValueError("当前内置 powershell 工具只支持 Windows")
@@ -133,6 +139,15 @@ async def run_application(options: Options) -> int:
     launch_cwd = (options.cwd or Path.cwd()).expanduser().resolve()
     if not launch_cwd.is_dir():
         raise NotADirectoryError(f"工作目录不存在：{launch_cwd}")
+    if options.init_config:
+        store = SettingsStore(launch_cwd, options.config)
+        try:
+            path = store.initialize()
+        except FileExistsError:
+            print(f"配置已存在，保留原文件：{store.path}")
+            return 0
+        print(f"已创建配置：{path}\n请填写 api_key；运行 citrus 后可输入 /model 选择模型。")
+        return 0
     directory = (
         options.session_dir.expanduser().resolve()
         if options.session_dir is not None
@@ -180,46 +195,45 @@ async def run_application(options: Options) -> int:
             resources.enter_context(session_lease(path))
 
         context_files = load_project_context(cwd)
+        extensions = ExtensionPreferences(cwd)
+        skills = SkillManager(cwd, extensions)
+        mcp = MCPManager(cwd, extensions, read_only=set(settings.tools) == set(READ_ONLY_TOOLS))
+        resources.push_async_callback(mcp.close)
+        await mcp.refresh()
         context = manager.build_context()
         fake = options.fake or context.provider == "fake"
-        provider: Provider
-        model: ModelSpec
+        fake_provider = FakeProvider(
+            chunks=["这是离线模拟回答。", "当前入口已连接事件流、", "会话保存和消息队列。",
+                    "模拟模型只输出预设文字，", "不会执行你的编程任务。\n"],
+            delay_seconds=0.25,
+        )
+        client = await resources.enter_async_context(httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=30.0, read=options.model_timeout, write=120.0, pool=30.0),
+        ))
+        models = ModelController(
+            SettingsStore(cwd, options.config), client, cwd, settings.tools,
+            context_files, options.max_output_tokens, fake_provider=fake_provider, skills=skills,
+        )
         if fake:
             if context.provider not in (None, "fake"):
                 raise ValueError("--fake 不能用于恢复真实模型会话")
-            fake_provider = FakeProvider(
-                chunks=["这是离线模拟回答。", "当前入口已连接事件流、", "会话保存和消息队列。",
-                        "模拟模型只输出预设文字，", "不会执行你的编程任务。\n"],
-                delay_seconds=0.25,
-            )
-            provider = fake_provider
             model = fake_provider.get_models()[0]
-            if options.model is not None and options.model != model.id:
+            if options.model is not None and options.model not in {model.id, "fake/" + model.id}:
                 raise ValueError("离线模式的模型 ID 为 fake-text")
         else:
-            if context.provider not in (None, "deepseek"):
-                raise ValueError(f"CLI 尚未接入此 Provider：{context.provider}")
-            config = load_connection_config()
-            model_id = options.model or context.model_id or config.model_id
-            model = ModelSpec(
-                id=model_id, name=model_id, provider=config.provider_id,
-                api="chat-completions", base_url=config.base_url,
-                context_window=CONTEXT_WINDOW,
-                supports_images=model_id in DEEPSEEK_VISION_MODEL_IDS,
-            )
-            client = await resources.enter_async_context(httpx.AsyncClient(
-                timeout=httpx.Timeout(connect=30.0, read=options.model_timeout, write=120.0, pool=30.0),
-            ))
-            provider = DeepSeekProvider(client, model, config.api_key)
+            reference = options.model or (f"{context.provider}/{context.model_id}" if context.provider else None)
+            model = models.resolve(reference, provider_id=options.provider)
+        provider = models.provider(model)
 
         if context.provider is not None and (
             context.provider != model.provider or context.model_id != model.id
         ):
-            raise ValueError("恢复时必须使用会话记录的模型，当前尚未提供模型切换入口")
-        tools = create_tools(cwd, settings.tools)
+            raise ValueError("恢复时先使用会话记录的模型；进入 CLI 后可通过 /model 切换。")
+        builtin_tools = create_tools(cwd, settings.tools)
+        tools = builtin_tools + mcp.tools
         system_prompt = build_system_prompt(
             cwd, settings.tools, context_files,
-            model_id=model.id, supports_images=model.supports_images,
+            model_id=f"{model.provider}/{model.id}", supports_images=model.supports_images,
         )
         if options.resume is None:
             manager.save(path)
@@ -229,26 +243,36 @@ async def run_application(options: Options) -> int:
         session = CodingSession(
             provider=provider, model=model, tools=tools, session_manager=manager,
             system_prompt=system_prompt,
-            hooks=SystemPromptHooks(system_prompt),
-            options=ModelOptions(max_output_tokens=options.max_output_tokens),
+            hooks=models.hooks(model),
+            options=models.options(model),
             max_turns=options.max_turns,
         )
+        console.set_model(model, models.options(model).max_output_tokens)
         console.welcome(
             cwd, model,
             fake=fake, resumed=options.resume is not None, interactive=options.prompt is None,
         )
         if recovered:
             console.note(f"[恢复] 为 {recovered} 个缺少结果的工具调用补充了执行状态未知记录。")
+        for diagnostic in skills.diagnostics:
+            console.note(f"[Skill] {diagnostic}")
+        for name, status in mcp.status.items():
+            if status.startswith("连接失败"):
+                console.note(f"[MCP] {name}：{status}；可用 /mcp reload 重试。")
         if options.resume is not None and options.prompt is None:
             console.history(session, limit=4)
         if options.prompt is not None:
             with cancel_on_sigint(session, console):
-                outcome = await run_turn(session, console, options.prompt)
+                outcome = await run_turn(
+                    session, console, skills.expand_mentions(options.prompt), display_text=options.prompt,
+                )
             return outcome.exit_code
-        return await InteractiveTerminal(session, console).run()
+        return await InteractiveTerminal(
+            session, console, models=models, skills=skills, mcp=mcp, builtin_tools=builtin_tools,
+        ).run()
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     try:
         options = parse_options(argv)
         return asyncio.run(run_application(options))

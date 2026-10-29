@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import base64
 from pathlib import Path
@@ -26,7 +27,7 @@ class ReadArguments(BaseModel):
         description="The first line to read, starting from 1.",
     )
 
-    limit: int | None = Field(
+    limit: Optional[int] = Field(
         default=None,
         ge=1,
         description="The maximum number of lines to read.",
@@ -42,7 +43,7 @@ class ReadTool:
         "continue with the suggested offset to read more."
     )
 
-    def __init__(self, cwd: Path, *, operations: FileOperations | None = None) -> None:
+    def __init__(self, cwd: Path, *, operations: Optional[FileOperations] = None) -> None:
         self._cwd = cwd
         self._ops = LocalFileOperations() if operations is None else operations
 
@@ -74,7 +75,7 @@ class ReadTool:
         args: ReadArguments,
     ) -> ToolExecutionResult:
         buffer = self._ops.read_bytes(path)
-        mime_type: str | None = None
+        mime_type: Optional[str] = None
         if buffer.startswith(b"\x89PNG\r\n\x1a\n"):
             mime_type = "image/png"
         elif buffer.startswith(b"\xff\xd8\xff"):

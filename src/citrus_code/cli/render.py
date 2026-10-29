@@ -1,11 +1,12 @@
 """Rich transcript rendering; the terminal owns interactive cursor movement."""
+from typing import Optional
 
 import time
 from collections.abc import Awaitable, Callable
 from io import StringIO
 from pathlib import Path
 
-from rich.console import Console as RichConsole, Group
+from rich.console import Console as RichConsole, ConsoleDimensions, Group
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.padding import Padding
@@ -23,7 +24,7 @@ from ..ai.events import DoneEvent, ErrorEvent, RetryEvent, StartEvent, TextDelta
 from ..ai.types import Message, ModelSpec, TextContent, ToolCall
 from ..coding.coding_session import CodingSession
 from ..coding.session import CompactionEntry, SessionMessageEntry
-from .theme import BORDER, RICH_THEME, clean_text
+from .theme import BORDER, RICH_THEME, clean_text, format_context_window
 from .welcome import build_welcome
 
 
@@ -37,29 +38,58 @@ def markdown(text: str) -> Markdown:
     return Markdown(clean_text(text), code_theme="monokai", hyperlinks=False)
 
 
+class TranscriptRichConsole(RichConsole):
+    width_provider: Optional[Callable[[], int]] = None
+
+    @property
+    def size(self) -> ConsoleDimensions:
+        size = super().size
+        if self.width_provider is not None:
+            return ConsoleDimensions(max(1, self.width_provider()), size.height)
+        return size
+
+
 class Console:
-    def __init__(self, verbose: bool = False, *, max_output_tokens: int | None = None) -> None:
+    def __init__(self, verbose: bool = False, *, max_output_tokens: Optional[int] = None) -> None:
         self.verbose = verbose
         self.max_output_tokens = max_output_tokens
-        self.rich = RichConsole(theme=RICH_THEME, markup=False, highlight=False, emoji=False)
+        self.rich = TranscriptRichConsole(theme=RICH_THEME, markup=False, highlight=False, emoji=False)
         self.model_name = ""
+        self.model_display_name = ""
+        self.provider_name = ""
+        self.context_window = 1_000_000
         self.supports_images = False
         self.phase = "就绪"
         self._response = ""
-        self._preview_listener: Callable[[], None] | None = None
-        self._output_flush: Callable[[], Awaitable[None]] | None = None
-        self._live: Live | None = None
+        self._preview_listener: Optional[Callable[[], None]] = None
+        self._output_flush: Optional[Callable[[], Awaitable[None]]] = None
+        self._live: Optional[Live] = None
         self._started = 0.0
         self._busy = False
         self._tool_started: dict[str, float] = {}
         self._input_tokens = 0
         self._output_tokens = 0
-        self._welcome_context: tuple[Path, str, bool] | None = None
+        self._last_cache_hit_rate: Optional[float] = None
+        self._welcome_context: Optional[tuple[Path, str, bool]] = None
         self._welcome_visible = False
 
     @property
     def response(self) -> str:
         return self._response
+
+    @property
+    def cache_hit_rate(self) -> Optional[float]:
+        return self._last_cache_hit_rate
+
+    def set_model(self, model: ModelSpec, max_output_tokens: Optional[int]) -> None:
+        self.model_name = model.id
+        self.model_display_name = model.name or model.id
+        self._last_cache_hit_rate = None
+        self.provider_name = model.provider
+        self.context_window = model.context_window or 1_000_000
+        self.supports_images = model.supports_images
+        self.max_output_tokens = max_output_tokens
+        self._refresh()
 
     @property
     def is_busy(self) -> bool:
@@ -85,11 +115,11 @@ class Console:
         )
         if compact:
             renderer.print(Text(
-                f"Citrus Code · {clean_text(model_id)} · 1M",
+                f"Citrus Code · {clean_text(model_id)} · {format_context_window(self.context_window)}",
                 style="accent", no_wrap=True, overflow="ellipsis",
             ))
         else:
-            renderer.print(build_welcome(cwd, model_id, resumed=resumed, width=width))
+            renderer.print(build_welcome(cwd, model_id, resumed=resumed, width=width, context_window=self.context_window))
         return buffer.getvalue().rstrip("\n")
 
     @property
@@ -105,10 +135,10 @@ class Console:
         self.phase = "就绪"
         self._refresh()
 
-    def set_preview_listener(self, listener: Callable[[], None] | None) -> None:
+    def set_preview_listener(self, listener: Optional[Callable[[], None]]) -> None:
         self._preview_listener = listener
 
-    def set_output_flush(self, callback: Callable[[], Awaitable[None]] | None) -> None:
+    def set_output_flush(self, callback: Optional[Callable[[], Awaitable[None]]]) -> None:
         self._output_flush = callback
 
     async def flush_output(self) -> None:
@@ -136,7 +166,7 @@ class Console:
             self._live.stop()
             self._live = None
 
-    def finish_response(self, text: str | None = None) -> None:
+    def finish_response(self, text: Optional[str] = None) -> None:
         content = self._response if text is None else text
         self._response = ""
         if self._live is not None:
@@ -163,7 +193,10 @@ class Console:
         self, cwd: Path, model: ModelSpec, *, fake: bool, resumed: bool, interactive: bool,
     ) -> None:
         self.model_name = model.id
+        self.model_display_name = model.name or model.id
         self.supports_images = model.supports_images
+        self.provider_name = model.provider
+        self.context_window = model.context_window or 1_000_000
         if interactive:
             # The prompt owns this panel so resize can repaint it, rather than
             # leaving a permanently printed border for the terminal to reflow.
@@ -171,7 +204,7 @@ class Console:
             self._welcome_visible = True
         else:
             self.rich.print(Text.assemble(
-                ("Citrus Code", "accent"), f"  {model.id} · 1M  ", (str(cwd), "muted"),
+                ("Citrus Code", "accent"), f"  {model.id} · {format_context_window(self.context_window)}  ", (str(cwd), "muted"),
             ))
         if fake:
             self.note("[离线模式] 只输出预设文字，不执行编程任务。")
@@ -223,9 +256,13 @@ class Console:
             elif isinstance(model_event, ErrorEvent):
                 self.finish_response(message_text(model_event.error) or self._response)
         elif isinstance(event, AssistantMessageCommittedEvent):
-            if event.message.usage is not None:
-                self._input_tokens += event.message.usage.input_tokens
-                self._output_tokens += event.message.usage.output_tokens
+            usage = event.message.usage
+            self._last_cache_hit_rate = None
+            if usage is not None:
+                self._input_tokens += usage.input_tokens
+                self._output_tokens += usage.output_tokens
+                if usage.input_tokens > 0 and usage.cache_read_tokens is not None and usage.cache_read_tokens <= usage.input_tokens:
+                    self._last_cache_hit_rate = usage.cache_read_tokens / usage.input_tokens
         elif isinstance(event, MessageAcceptedEvent):
             label = "引导消息已接纳" if event.source == "steering" else "后续任务已接纳"
             self.rich.print(Panel(Text(message_text(event.message)), title=label, border_style="info"))
@@ -306,18 +343,18 @@ class Console:
         estimate = session.compaction.last_estimate if session.compaction is not None else None
         table = Table.grid(padding=(0, 2))
         for label, value in (
-            ("状态", self.phase), ("模型", self.model_name),
+            ("状态", self.phase), ("供应商", self.provider_name), ("模型", self.model_name),
             ("模型输入", "文字、图片" if self.supports_images else "文字"),
             ("单次输出上限", f"{self.max_output_tokens:,} tokens" if self.max_output_tokens is not None else "由调用方配置"),
             ("轮次", str(session.agent.state.turn)),
             ("排队消息", "有" if session.has_queued_messages() else "无"),
-            ("上下文", f"约 {estimate:,} / 1,000,000 tokens（上次检查）" if estimate is not None else "尚未估算"),
+            ("上下文", f"约 {estimate:,} / {self.context_window:,} tokens（上次检查）" if estimate is not None else f"{self.context_window:,} tokens"),
             ("当前节点", manager.leaf_id or "无"), ("会话文件", str(manager.file_path)),
         ):
             table.add_row(Text(label, style="muted"), Text(clean_text(value)))
         self.rich.print(Panel(table, title="会话状态", border_style=BORDER, title_align="left"))
 
-    def history(self, session: CodingSession, limit: int | None = None) -> None:
+    def history(self, session: CodingSession, limit: Optional[int] = None) -> None:
         messages = [m for m in session.agent.state.messages if m.role in ("user", "assistant")]
         if limit is not None:
             messages = messages[-limit:]

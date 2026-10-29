@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import os
 import shutil
@@ -25,7 +26,7 @@ async def spawn_process(
     cwd: Path,
     *,
     merge_stderr: bool = False,
-    output: BinaryIO | None = None,
+    output: Optional[BinaryIO] = None,
 ) -> asyncio.subprocess.Process:
     return await asyncio.create_subprocess_exec(
         *command,

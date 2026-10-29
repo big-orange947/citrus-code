@@ -1,23 +1,29 @@
 [project]
 name = "citrus-code"
-version = "0.1.0"
+version = "1.2.0"
 description = "A small Python coding agent inspired by pi, built as a learning project."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.12"
+requires-python = ">=3.9"
 keywords = ["coding-agent", "agent", "cli", "learning", "deepseek"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "httpx>=0.28.1",
-    "prompt-toolkit==3.0.53",
+    "mcp>=1.30,<2 ; python_full_version >= '3.10'",
+    "prompt-toolkit==3.0.52; python_version < '3.10'",
+    "prompt-toolkit==3.0.53; python_version >= '3.10'",
     "pydantic>=2,<3",
+    "pyyaml>=6,<7",
     "rich==14.2.0",
 ]
 

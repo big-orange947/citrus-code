@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import difflib
 from pathlib import Path
@@ -33,7 +34,7 @@ class EditTool:
         "Use multiple edits for separate locations; merge overlapping changes."
     )
 
-    def __init__(self, cwd: Path, *, operations: FileOperations | None = None) -> None:
+    def __init__(self, cwd: Path, *, operations: Optional[FileOperations] = None) -> None:
         self._cwd = cwd
         self._ops = LocalFileOperations() if operations is None else operations
 

@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import time
 from collections.abc import AsyncIterator
@@ -47,7 +48,7 @@ class FakeProvider:
         self,
         model: ModelSpec,
         context: ModelContext,
-        options: ModelOptions | None = None,
+        options: Optional[ModelOptions] = None,
     ) -> AsyncIterator[AssistantMessageEvent]:
         if(
             model.provider != self.id
